@@ -213,6 +213,152 @@ static const MemoryRegionOps crg_aon_ops = {
 };
 
 /**
+ * OTPC
+ */
+
+#define OTPC 0x30070000
+
+typedef enum {
+  HW_OTPC_MODE_PDOWN = 0,    /**< OTP cell and LDO are inactive*/
+  HW_OTPC_MODE_DSTBY = 1,    /**< OTP cell is powered on LDO is inactive*/
+  HW_OTPC_MODE_STBY = 2,    /**< OTP cell and LDO are powered on, chip select is deactivated*/
+  HW_OTPC_MODE_READ = 3,    /**< OTP cell can be read*/
+  HW_OTPC_MODE_PROG = 4,    /**< OTP cell can be programmed*/
+  HW_OTPC_MODE_PVFY = 5,    /**< OTP cell can be read in PVFY margin read mode*/
+  HW_OTPC_MODE_RINI = 6     /**< OTP cell can be read in RINI margin read mode*/
+} HW_OTPC_MODE;
+
+// Mode register
+#define OTPC_MODE_REG           0x00
+#define OTPC_MODE_MODE_BIT       0
+
+// Status register
+#define OTPC_STAT_REG           0x04
+
+// The address of the word that will be programmed, when the PROG mode is used.
+#define OTPC_PADDR_REG          0x08
+
+// The 32-bit word that will be programmed, when the PROG mode is used.
+#define OTPC_PWORD_REG          0x0C
+
+// Various timing parameters of the OTP cell.
+#define OTPC_TIM1_REG           0x10
+
+// Various timing parameters of the OTP cell.
+#define OTPC_TIM2_REG           0x14
+
+HW_OTPC_MODE otpc_mode;
+
+static uint64_t otpc_mem_read(void *opaque, hwaddr offset, unsigned size) {
+
+    switch (offset) {
+        case OTPC_MODE_REG:
+            return otpc_mode;
+
+        case OTPC_STAT_REG: {
+            uint32_t out = 0;
+            out |= 1 << 0;
+            out |= 1 << 1;
+            out |= 1 << 2;
+
+            return out;
+        }
+    }
+
+    return 0;
+}
+
+static void otpc_mem_write(void *opaque, hwaddr offset,
+                           uint64_t value, unsigned size) {
+    switch (offset) {
+        case OTPC_MODE_REG:
+            otpc_mode = (value >> OTPC_MODE_MODE_BIT) & 0b111;
+            break;
+    }
+}
+
+static const MemoryRegionOps otpc_ops = {
+    .read = otpc_mem_read,
+    .write = otpc_mem_write,
+    .endianness = DEVICE_NATIVE_ENDIAN,
+};
+
+
+/**
+ * CRG_XTAL
+ */
+
+#define PLL_SYS_CTRL1_REG                                       0x60
+#define CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_SEL_MIN_CUR_INT_BIT      14
+#define CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_PRE_DIV_BIT              11
+#define CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_N_DIV_BIT                4
+#define CRG_XTAL_PLL_SYS_CTRL1_REG_LDO_PLL_VREF_HOLD_BIT        3
+#define CRG_XTAL_PLL_SYS_CTRL1_REG_LDO_PLL_ENABLE_BIT           2
+#define CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_EN_BIT                   1
+#define CRG_XTAL_PLL_SYS_CTRL1_REG_LDO_PLL_ENABLE               (1U << CRG_XTAL_PLL_SYS_CTRL1_REG_LDO_PLL_ENABLE_BIT)
+#define CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_EN                       (1U << CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_EN_BIT)
+
+#define PLL_SYS_STATUS_REG                                      0x70
+#define CRG_XTAL_PLL_SYS_STATUS_REG_LDO_PLL_OK_BIT              15
+#define CRG_XTAL_PLL_SYS_STATUS_REG_PLL_CALIBRATION_END_BIT     11
+#define CRG_XTAL_PLL_SYS_STATUS_REG_PLL_BEST_MIN_CUR_BIT        5
+#define CRG_XTAL_PLL_SYS_STATUS_REG_PLL_LOCK_FINE_BIT           0
+
+bool ldoPllOn = false;
+bool pllOn = false;
+
+static uint64_t crg_xtal_mem_read(void *opaque, hwaddr offset, unsigned size) {
+
+    switch (offset) {
+        case PLL_SYS_CTRL1_REG: {
+            uint32_t out = 0;
+            out |= 1 << CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_SEL_MIN_CUR_INT_BIT;
+            out |= 2 << 12;
+            out |= 1 << CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_PRE_DIV_BIT;
+            out |= 6 << CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_N_DIV_BIT;
+            out |= 0 << CRG_XTAL_PLL_SYS_CTRL1_REG_LDO_PLL_VREF_HOLD_BIT;
+            if (ldoPllOn)
+                out |= 1 << CRG_XTAL_PLL_SYS_CTRL1_REG_LDO_PLL_ENABLE_BIT;
+            if (pllOn)
+                out |= 1 << CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_EN_BIT;
+
+            return out;
+        }
+        case PLL_SYS_STATUS_REG: {
+            uint32_t out = 0;
+            if (ldoPllOn)
+                out |= 1 << CRG_XTAL_PLL_SYS_STATUS_REG_LDO_PLL_OK_BIT;
+            if (false) {
+                out |= 1 << CRG_XTAL_PLL_SYS_STATUS_REG_PLL_CALIBRATION_END_BIT;
+                out |= 1 << CRG_XTAL_PLL_SYS_STATUS_REG_PLL_BEST_MIN_CUR_BIT;
+                out |= 1 << CRG_XTAL_PLL_SYS_STATUS_REG_PLL_LOCK_FINE_BIT;
+            }
+
+            return out;
+        }
+    }
+
+    return 0;
+}
+
+static void crg_xtal_mem_write(void *opaque, hwaddr offset, uint64_t value, unsigned size) {
+    switch (offset) {
+        case PLL_SYS_CTRL1_REG:
+            if (value & CRG_XTAL_PLL_SYS_CTRL1_REG_LDO_PLL_ENABLE) {
+                ldoPllOn = true;
+            } else {
+                ldoPllOn = false;
+            }
+            break;
+    }
+}
+static const MemoryRegionOps crg_xtal_ops = {
+    .read = crg_xtal_mem_read,
+    .write = crg_xtal_mem_write,
+    .endianness = DEVICE_NATIVE_ENDIAN,
+};
+
+/**
  * Machine
  */
 
@@ -224,6 +370,8 @@ typedef struct {
   MemoryRegion sysram;
 
   MemoryRegion crg_aon;
+  MemoryRegion crg_xtal;
+  MemoryRegion otpc_c;
 } BipSMachineState;
 
 #define TYPE_BIP_S_MACHINE MACHINE_TYPE_NAME("bip-s")
@@ -275,6 +423,14 @@ static void bip_s_init(MachineState *machine) {
     static uint32_t crg_aon_val = 0xffffffff;
     memory_region_init_io(&bip->crg_aon, NULL, &crg_aon_ops, &crg_aon_val, "crc", 0x100);
     memory_region_add_subregion(system_memory, 0x50000000, &bip->crg_aon);
+
+    static uint32_t crg_xtal_val = 0xffffffff;
+    memory_region_init_io(&bip->crg_xtal, NULL, &crg_xtal_ops, &crg_xtal_val, "crg_xtal", 0x100);
+    memory_region_add_subregion(system_memory, 0x50010000U, &bip->crg_xtal);
+
+    static uint32_t otpc_val = 0xffffffff;
+    memory_region_init_io(&bip->otpc_c, NULL, &otpc_ops, &otpc_val, "otpc", 0x80000);
+    memory_region_add_subregion(system_memory, 0x30070000, &bip->otpc_c);
 
     load_image_targphys("/Users/Marijn/Downloads/tonlesap_202006191826_2.1.1.16_tonlesap.img", 0x0, 0x8192 * 1024);
 
