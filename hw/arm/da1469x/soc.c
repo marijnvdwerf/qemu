@@ -11,6 +11,38 @@
 #include "hw/loader.h"
 #include "qemu/log.h"
 #include "soc.h"
+#include "timer.h"
+
+static const int SRAM_BASE_ADDRESS = 0x20000000;
+static const int OTPC_BASE = 0x30070000;
+static const int MEMORY_QSPIF_S_BASE = 0x36000000;
+static const int QSPIC_BASE = 0x38000000;
+static const int CRG_TOP_BASE = 0x50000000;
+static const int PDC_BASE = 0x50000200;
+static const int DCDC_BASE = 0x50000300;
+static const int SYS_WDOG_BASE = 0x50000700;
+static const int CRG_XTAL_BASE = 0x50010000;
+static const int TIMER_BASE = 0x50010200;
+static const int TIMER2_BASE = 0x50010300;
+static const int SDADC_BASE = 0x50020800;
+static const int CRG_COM_BASE = 0x50020900;
+static const int GPIO_BASE = 0x50020A00;
+static const int GPADC_BASE = 0x50030900;
+static const int CHIP_VERSION_BASE = 0x50040200;
+static const int GPREG_BASE = 0x50040300;
+static const int CHARGER_BASE = 0x50040400;
+static const int TIMER3_BASE = 0x50040A00;
+static const int TIMER4_BASE = 0x50040B00;
+static const int MEMCTRL_BASE = 0x50050000;
+
+static const int DA1469X_NUM_TIMERS = 4;
+
+static const uint32_t timer_addr[DA1469X_NUM_TIMERS] = {
+    TIMER_BASE, TIMER2_BASE, TIMER3_BASE, TIMER4_BASE
+};
+static const int timer_irq[DA1469X_NUM_TIMERS] = {16, 17, 34, 35};
+
+#define DA1469X_NUM_TIMERS 4
 
 bool POWER_IS_UP = 1;
 bool DBG_IS_ACTIVE = 0;
@@ -408,6 +440,8 @@ typedef struct {
   MemoryRegion crg_aon;
   MemoryRegion crg_xtal;
   MemoryRegion otpc_c;
+
+  DA1469xTimerState timer[DA1469X_NUM_TIMERS];
 } DA2469xState;
 
 static inline void create_unimplemented_layer(const char *name, hwaddr base, hwaddr size) {
@@ -424,6 +458,10 @@ static void da1469x_soc_initfn(Object *obj) {
     DA2469xState *s = DA1469X_SOC(obj);
 
     sysbus_init_child_obj(obj, "armv7m", &s->armv7m, sizeof(s->armv7m), TYPE_ARMV7M);
+
+    for (int i = 0; i < DA1469X_NUM_TIMERS; i++) {
+        sysbus_init_child_obj(obj, "timer[*]", &s->timer[i], sizeof(s->timer[i]), TYPE_DA1469X_TIMER);
+    }
 }
 
 static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
@@ -449,38 +487,51 @@ static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
     memory_region_add_subregion(system_memory, 0x00000000, &bip->flash);
 
     memory_region_init_ram(&bip->sysram, NULL, "system", 512 * 1024, &error_fatal);
-    memory_region_add_subregion(system_memory, 0x20000000, &bip->sysram);
+    memory_region_add_subregion(system_memory, SRAM_BASE_ADDRESS, &bip->sysram);
 
     create_unimplemented_device("PSRAM", 0x00000000, 0xFFFFFFFF);
 
-    create_unimplemented_device("QSPIF_S", 0x36000000, 0x2000000);
-    create_unimplemented_device("QSPIC", 0x38000000, 0x2000000);
-    create_unimplemented_device("TIMER2", 0x50010300, 0x100);
-    create_unimplemented_device("SDADC", 0x50020800, 0x100);
-    create_unimplemented_device("CHIP_VERSION", 0x50040200, 0x100);
-    create_unimplemented_device("CRG_COM", 0x50020900, 0x100);
-    create_unimplemented_device("GPIO", 0x50020A00, 0x200);
-    create_unimplemented_device("GPADC", 0x50030900, 0x100);
-    create_unimplemented_device("DCDC", 0x50000300, 0x100);
-    create_unimplemented_device("SYS_WDOG", 0x50000700, 0x100);
-    create_unimplemented_device("GPREG", 0x50040300, 0x100);
-    create_unimplemented_device("CHARGER", 0x50040400, 0x100);
-    create_unimplemented_device("MEMCTRL", 0x50050000, 0x100);
+    create_unimplemented_device("QSPIF_S", MEMORY_QSPIF_S_BASE, 0x2000000);
+    create_unimplemented_device("QSPIC", QSPIC_BASE, 0x2000000);
+    create_unimplemented_device("SDADC", SDADC_BASE, 0x100);
+    create_unimplemented_device("CHIP_VERSION", CHIP_VERSION_BASE, 0x100);
+    create_unimplemented_device("CRG_COM", CRG_COM_BASE, 0x100);
+    create_unimplemented_device("GPIO", GPIO_BASE, 0x200);
+    create_unimplemented_device("GPADC", GPADC_BASE, 0x100);
+    create_unimplemented_device("DCDC", DCDC_BASE, 0x100);
+    create_unimplemented_device("SYS_WDOG", SYS_WDOG_BASE, 0x100);
+    create_unimplemented_device("GPREG", GPREG_BASE, 0x100);
+    create_unimplemented_device("CHARGER", CHARGER_BASE, 0x100);
+    create_unimplemented_device("MEMCTRL", MEMCTRL_BASE, 0x100);
 
     // Power Domains Controller
-    create_unimplemented_layer("PDC", 0x50000200, 0x100);
+    create_unimplemented_layer("PDC", PDC_BASE, 0x100);
 
     static uint32_t crg_aon_val = 0xffffffff;
     memory_region_init_io(&bip->crg_aon, NULL, &crg_aon_ops, &crg_aon_val, "crc", 0x100);
-    memory_region_add_subregion(system_memory, 0x50000000, &bip->crg_aon);
+    memory_region_add_subregion(system_memory, CRG_TOP_BASE, &bip->crg_aon);
 
     static uint32_t crg_xtal_val = 0xffffffff;
     memory_region_init_io(&bip->crg_xtal, NULL, &crg_xtal_ops, &crg_xtal_val, "crg_xtal", 0x100);
-    memory_region_add_subregion(system_memory, 0x50010000U, &bip->crg_xtal);
+    memory_region_add_subregion(system_memory, CRG_XTAL_BASE, &bip->crg_xtal);
 
     static uint32_t otpc_val = 0xffffffff;
     memory_region_init_io(&bip->otpc_c, NULL, &otpc_ops, &otpc_val, "otpc", 0x80000);
-    memory_region_add_subregion(system_memory, 0x30070000, &bip->otpc_c);
+    memory_region_add_subregion(system_memory, OTPC_BASE, &bip->otpc_c);
+
+
+    /* Timer 2 to 4 */
+    for (int i = 1; i < DA1469X_NUM_TIMERS; i++) {
+        DeviceState *dev = DEVICE(&(bip->timer[i]));
+        object_property_set_bool(OBJECT(&bip->timer[i]), true, "realized", &err);
+        if (err != NULL) {
+            error_propagate(errp, err);
+            return;
+        }
+        SysBusDevice *busdev = SYS_BUS_DEVICE(dev);
+        sysbus_mmio_map(busdev, 0, timer_addr[i]);
+        sysbus_connect_irq(busdev, 0, qdev_get_gpio_in(armv7m, timer_irq[i]));
+    }
 }
 
 static void da1469x_soc_class_init(ObjectClass *klass, void *data) {
