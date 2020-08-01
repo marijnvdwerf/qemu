@@ -159,13 +159,29 @@ static uint64_t pxa2xx_pic_mem_read(void *opaque, hwaddr offset,
                                     unsigned size) {
 
     switch (offset) {
+        case 0x00:
+        case 0x10:
+        case 0x24:
+        case 0x3C:
+        case 0x40:
+        case 0x44:
+        case 0x48:
+        case 0x50:
+        case 0x60:
+        case 0x64:
+        case 0x78:
+        case 0x84:
+        case 0xbc:
+        case 0xf0:
+        case 0xF8:
         case SYS_STAT_OFFSET:
         case PMU_CTRL_OFFSET:
         case CLK_CTRL_OFFSET:
             return getValue(offset);
 
         default:
-            qemu_log_mask(LOG_UNIMP, "Read from 0x%llX\n", offset + 0x50000000);
+            qemu_log_mask(LOG_UNIMP, "%s: unknown register 0x%02" HWADDR_PRIx "\n",
+                          __func__, offset);
     }
     return 0;
 }
@@ -174,16 +190,35 @@ static void pxa2xx_pic_mem_write(void *opaque, hwaddr offset,
                                  uint64_t value, unsigned size) {
 
     switch (offset) {
+        case 0x00:
+        case 0x10:
+        case 0x24:
+        case 0x3c:
+        case 0x40:
+        case 0x44:
+        case 0x48:
+        case 0x50:
+        case 0x60:
+        case 0x64:
+        case 0x74:
+        case 0x78:
+        case 0x80:
+        case 0x84:
+        case 0xa4:
+        case 0xc0:
+        case 0xf0:
+        case 0xf8:
         case SYS_STAT_OFFSET:
         case PMU_CTRL_OFFSET:
         case CLK_CTRL_OFFSET: {
             uint32_t current = getValue(offset);;
-            printf("Write 0x%08llX to  0x%llX (was 0x%08X)\n", value, offset + 0x50000000, current);
+//            printf("Write 0x%08llX to  0x%llX (was 0x%08X)\n", value, offset + 0x50000000, current);
             break;
         }
 
         default:
-            printf("Write 0x%llX to  0x%llX\n", value, offset + 0x50000000);
+            qemu_log_mask(LOG_UNIMP, "%s: unknown register 0x%02" HWADDR_PRIx "\n",
+                          __func__, offset);
             break;
     }
 
@@ -417,6 +452,20 @@ static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
     memory_region_add_subregion(system_memory, 0x20000000, &bip->sysram);
 
     create_unimplemented_device("PSRAM", 0x00000000, 0xFFFFFFFF);
+
+    create_unimplemented_device("QSPIF_S", 0x36000000, 0x2000000);
+    create_unimplemented_device("QSPIC", 0x38000000, 0x2000000);
+    create_unimplemented_device("TIMER2", 0x50010300, 0x100);
+    create_unimplemented_device("SDADC", 0x50020800, 0x100);
+    create_unimplemented_device("CHIP_VERSION", 0x50040200, 0x100);
+    create_unimplemented_device("CRG_COM", 0x50020900, 0x100);
+    create_unimplemented_device("GPIO", 0x50020A00, 0x200);
+    create_unimplemented_device("GPADC", 0x50030900, 0x100);
+    create_unimplemented_device("DCDC", 0x50000300, 0x100);
+    create_unimplemented_device("SYS_WDOG", 0x50000700, 0x100);
+    create_unimplemented_device("GPREG", 0x50040300, 0x100);
+    create_unimplemented_device("CHARGER", 0x50040400, 0x100);
+    create_unimplemented_device("MEMCTRL", 0x50050000, 0x100);
 
     // Power Domains Controller
     create_unimplemented_layer("PDC", 0x50000200, 0x100);
