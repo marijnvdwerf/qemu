@@ -18,8 +18,10 @@ static const int OTPC_BASE = 0x30070000;
 static const int MEMORY_QSPIF_S_BASE = 0x36000000;
 static const int QSPIC_BASE = 0x38000000;
 static const int CRG_TOP_BASE = 0x50000000;
+static const int WAKEUP_BASE = 0x50000100;
 static const int PDC_BASE = 0x50000200;
 static const int DCDC_BASE = 0x50000300;
+static const int RTC_BASE = 0x50000400;
 static const int SYS_WDOG_BASE = 0x50000700;
 static const int CRG_XTAL_BASE = 0x50010000;
 static const int TIMER_BASE = 0x50010200;
@@ -27,10 +29,13 @@ static const int TIMER2_BASE = 0x50010300;
 static const int SDADC_BASE = 0x50020800;
 static const int CRG_COM_BASE = 0x50020900;
 static const int GPIO_BASE = 0x50020A00;
+static const int PWMLED_BASE = 0x50030500;
 static const int GPADC_BASE = 0x50030900;
+static const int LRA_BASE = 0x50030A00;
 static const int CHIP_VERSION_BASE = 0x50040200;
 static const int GPREG_BASE = 0x50040300;
 static const int CHARGER_BASE = 0x50040400;
+static const int CRG_SYS_BASE = 0x50040500;
 static const int TIMER3_BASE = 0x50040A00;
 static const int TIMER4_BASE = 0x50040B00;
 static const int MEMCTRL_BASE = 0x50050000;
@@ -491,6 +496,11 @@ static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
 
     create_unimplemented_device("PSRAM", 0x00000000, 0xFFFFFFFF);
 
+    create_unimplemented_device("WKUP", WAKEUP_BASE, 0x100);
+    create_unimplemented_device("RTC", RTC_BASE, 0x100);
+    create_unimplemented_device("PWMWLED", PWMLED_BASE, 0x100);
+    create_unimplemented_device("CRG_2", CRG_SYS_BASE, 0x100);
+    create_unimplemented_device("LRA", LRA_BASE, 0x100);
     create_unimplemented_device("QSPIF_S", MEMORY_QSPIF_S_BASE, 0x2000000);
     create_unimplemented_device("QSPIC", QSPIC_BASE, 0x2000000);
     create_unimplemented_device("SDADC", SDADC_BASE, 0x100);
