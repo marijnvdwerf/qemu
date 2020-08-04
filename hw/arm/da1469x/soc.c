@@ -431,6 +431,32 @@ static const MemoryRegionOps crg_xtal_ops = {
     .endianness = DEVICE_NATIVE_ENDIAN,
 };
 
+
+/**
+ * SDADC
+ */
+
+#define SDADC_RESULT_REG    0x18
+
+static uint64_t sdadc_mem_read(void *opaque, hwaddr offset, unsigned size) {
+    switch (offset) {
+        case SDADC_RESULT_REG:
+            return 37000;
+    }
+
+    return 0;
+}
+
+static void sdadc_mem_write(void *opaque, hwaddr offset, uint64_t value, unsigned size) {
+
+}
+
+static const MemoryRegionOps sdadc_ops = {
+    .read = sdadc_mem_read,
+    .write = sdadc_mem_write,
+    .endianness = DEVICE_NATIVE_ENDIAN,
+};
+
 /**
  * Machine
  */
@@ -443,6 +469,7 @@ typedef struct {
   MemoryRegion sysram;
 
   MemoryRegion crg_aon;
+  MemoryRegion sdadc;
   MemoryRegion crg_xtal;
   MemoryRegion otpc_c;
 
@@ -503,7 +530,6 @@ static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
     create_unimplemented_device("LRA", LRA_BASE, 0x100);
     create_unimplemented_device("QSPIF_S", MEMORY_QSPIF_S_BASE, 0x2000000);
     create_unimplemented_device("QSPIC", QSPIC_BASE, 0x2000000);
-    create_unimplemented_device("SDADC", SDADC_BASE, 0x100);
     create_unimplemented_device("CHIP_VERSION", CHIP_VERSION_BASE, 0x100);
     create_unimplemented_device("CRG_COM", CRG_COM_BASE, 0x100);
     create_unimplemented_device("GPIO", GPIO_BASE, 0x200);
@@ -516,6 +542,10 @@ static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
 
     // Power Domains Controller
     create_unimplemented_layer("PDC", PDC_BASE, 0x100);
+
+    static uint32_t sdadc_val = 0xffffffff;
+    memory_region_init_io(&bip->sdadc, NULL, &sdadc_ops, &sdadc_val, "SDADC", 0x100);
+    memory_region_add_subregion(system_memory, SDADC_BASE, &bip->sdadc);
 
     static uint32_t crg_aon_val = 0xffffffff;
     memory_region_init_io(&bip->crg_aon, NULL, &crg_aon_ops, &crg_aon_val, "crc", 0x100);
