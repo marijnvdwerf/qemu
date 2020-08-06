@@ -453,6 +453,90 @@ static const MemoryRegionOps sdadc_ops = {
 };
 
 /**
+ * MEMCTRL
+ */
+
+#define CMI_CODE_BASE_REG 0x20
+#define CMI_DATA_BASE_REG 0x24
+#define CMI_SHARED_BASE_REG 0x28
+#define CMI_END_REG 0x2C
+#define SNC_BASE_REG 0x30
+#define BUSY_SET_REG 0x74
+#define BUSY_RESET_REG 0x78
+#define BUSY_STAT_REG 0x7C
+
+
+typedef enum {
+  HW_BSR_MASTER_NONE = 0,
+  HW_BSR_MASTER_SNC = 1,
+  HW_BSR_MASTER_SYSCPU = 2,
+  HW_BSR_MASTER_CMAC = 3,
+} HW_BSR_MASTER_ID;
+
+static HW_BSR_MASTER_ID bsr[16] = {0};
+
+static uint64_t memctrl_mem_read(void *opaque, hwaddr offset, unsigned size) {
+
+    switch (offset) {
+        case BUSY_STAT_REG: {
+            uint32_t out = 0;
+            for (int i = 0; i < 16; i++) {
+                out |= bsr[i] << i * 2;
+            }
+            return out;
+        }
+        default:
+            printf("[MEMCTRL] Unknown read: 0x%"HWADDR_PRIx"\n", offset);
+    }
+    return 0;
+}
+
+static void memctrl_mem_write(void *opaque, hwaddr offset, uint64_t value, unsigned size) {
+    switch (offset) {
+        case CMI_CODE_BASE_REG:
+        case CMI_DATA_BASE_REG:
+        case CMI_SHARED_BASE_REG:
+        case CMI_END_REG:
+        case SNC_BASE_REG:
+            break;
+
+        case BUSY_RESET_REG: {
+            for (int i = 0; i < 16; i++) {
+                int newVal = (value >> (i * 2)) & 0b11;
+                if (newVal == bsr[i]) {
+                    bsr[i] = HW_BSR_MASTER_NONE;
+                }
+            }
+            break;
+        }
+
+        case BUSY_SET_REG: {
+            for (int i = 0; i < 16; i++) {
+                HW_BSR_MASTER_ID newVal = (value >> (i * 2)) & 0b11;
+                if (newVal != HW_BSR_MASTER_NONE) {
+                    if (bsr[i] == HW_BSR_MASTER_NONE) {
+                        bsr[i] = newVal;
+                    }
+                }
+            }
+            break;
+        }
+
+        default:
+            printf("[MEMCTRL] Unknown write: 0x%"HWADDR_PRIx"\n", offset);
+            break;
+
+            break;
+    }
+}
+
+static const MemoryRegionOps memctrl_ops = {
+    .read =  memctrl_mem_read,
+    .write = memctrl_mem_write,
+    .endianness = DEVICE_NATIVE_ENDIAN,
+};
+
+/**
  * Machine
  */
 
@@ -522,6 +606,10 @@ static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
 
     // Power Domains Controller
     create_unimplemented_layer("PDC", PDC_BASE, 0x100);
+
+    static uint32_t memctrl_val = 0xffffffff;
+    memory_region_init_io(&bip->memctrl, NULL, &memctrl_ops, &memctrl_val, "MEMCTRL", 0x100);
+    memory_region_add_subregion(system_memory, MEMCTRL_BASE, &bip->memctrl);
 
     static uint32_t sdadc_val = 0xffffffff;
     memory_region_init_io(&bip->sdadc, NULL, &sdadc_ops, &sdadc_val, "SDADC", 0x100);

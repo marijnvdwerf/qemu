@@ -21,6 +21,7 @@ typedef struct {
   MemoryRegion sdadc;
   MemoryRegion crg_xtal;
   MemoryRegion otpc_c;
+  MemoryRegion memctrl;
 
   DA1469xQspiState qspi;
   DA1469xTimerState timer[DA1469X_NUM_TIMERS];
