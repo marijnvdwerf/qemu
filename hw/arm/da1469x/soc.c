@@ -10,8 +10,7 @@
 #include "exec/address-spaces.h"
 #include "hw/loader.h"
 #include "qemu/log.h"
-#include "soc.h"
-#include "timer.h"
+#include "hw/arm/da1469x/soc.h"
 
 static const int SRAM_BASE_ADDRESS = 0x20000000;
 static const int OTPC_BASE = 0x30070000;
@@ -40,14 +39,10 @@ static const int TIMER3_BASE = 0x50040A00;
 static const int TIMER4_BASE = 0x50040B00;
 static const int MEMCTRL_BASE = 0x50050000;
 
-static const int DA1469X_NUM_TIMERS = 4;
-
 static const uint32_t timer_addr[DA1469X_NUM_TIMERS] = {
     TIMER_BASE, TIMER2_BASE, TIMER3_BASE, TIMER4_BASE
 };
 static const int timer_irq[DA1469X_NUM_TIMERS] = {16, 17, 34, 35};
-
-#define DA1469X_NUM_TIMERS 4
 
 bool POWER_IS_UP = 1;
 bool DBG_IS_ACTIVE = 0;
@@ -461,21 +456,6 @@ static const MemoryRegionOps sdadc_ops = {
  * Machine
  */
 
-typedef struct {
-  SysBusDevice parent_obj;
-
-  ARMv7MState armv7m;
-  MemoryRegion flash;
-  MemoryRegion sysram;
-
-  MemoryRegion crg_aon;
-  MemoryRegion sdadc;
-  MemoryRegion crg_xtal;
-  MemoryRegion otpc_c;
-
-  DA1469xTimerState timer[DA1469X_NUM_TIMERS];
-} DA2469xState;
-
 static inline void create_unimplemented_layer(const char *name, hwaddr base, hwaddr size) {
     DeviceState *dev = qdev_create(NULL, TYPE_UNIMPLEMENTED_DEVICE);
 
@@ -487,9 +467,11 @@ static inline void create_unimplemented_layer(const char *name, hwaddr base, hwa
 }
 
 static void da1469x_soc_initfn(Object *obj) {
-    DA2469xState *s = DA1469X_SOC(obj);
+    DA1469xState *s = DA1469X_SOC(obj);
 
     sysbus_init_child_obj(obj, "armv7m", &s->armv7m, sizeof(s->armv7m), TYPE_ARMV7M);
+
+    sysbus_init_child_obj(obj, "qspi", &s->qspi, sizeof(s->qspi), TYPE_DA1469X_QSPI);
 
     for (int i = 0; i < DA1469X_NUM_TIMERS; i++) {
         sysbus_init_child_obj(obj, "timer[*]", &s->timer[i], sizeof(s->timer[i]), TYPE_DA1469X_TIMER);
@@ -498,7 +480,7 @@ static void da1469x_soc_initfn(Object *obj) {
 
 static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
     Error *err = NULL;
-    DA2469xState *bip = DA1469X_SOC(dev_soc);
+    DA1469xState *bip = DA1469X_SOC(dev_soc);
 
     MemoryRegion *system_memory = get_system_memory();
 
@@ -528,8 +510,6 @@ static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
     create_unimplemented_device("PWMWLED", PWMLED_BASE, 0x100);
     create_unimplemented_device("CRG_2", CRG_SYS_BASE, 0x100);
     create_unimplemented_device("LRA", LRA_BASE, 0x100);
-    create_unimplemented_device("QSPIF_S", MEMORY_QSPIF_S_BASE, 0x2000000);
-    create_unimplemented_device("QSPIC", QSPIC_BASE, 0x2000000);
     create_unimplemented_device("CHIP_VERSION", CHIP_VERSION_BASE, 0x100);
     create_unimplemented_device("CRG_COM", CRG_COM_BASE, 0x100);
     create_unimplemented_device("GPIO", GPIO_BASE, 0x200);
@@ -560,6 +540,12 @@ static void da1469x_soc_realize(DeviceState *dev_soc, Error **errp) {
     memory_region_add_subregion(system_memory, OTPC_BASE, &bip->otpc_c);
 
 
+    DeviceState *dev = DEVICE(&(bip->qspi));
+    object_property_set_bool(OBJECT(&bip->qspi), true, "realized", &err);
+    SysBusDevice *busdev = SYS_BUS_DEVICE(dev);
+    sysbus_mmio_map(busdev, 0, QSPIC_BASE);
+    sysbus_mmio_map(busdev, 1, MEMORY_QSPIF_S_BASE);
+
     /* Timer 2 to 4 */
     for (int i = 1; i < DA1469X_NUM_TIMERS; i++) {
         DeviceState *dev = DEVICE(&(bip->timer[i]));
@@ -583,7 +569,7 @@ static void da1469x_soc_class_init(ObjectClass *klass, void *data) {
 static const TypeInfo da1469x_soc_info = {
     .name          = TYPE_DA1469X_SOC,
     .parent        = TYPE_SYS_BUS_DEVICE,
-    .instance_size = sizeof(DA2469xState),
+    .instance_size = sizeof(DA1469xState),
     .instance_init = da1469x_soc_initfn,
     .class_init    = da1469x_soc_class_init,
 };
