@@ -85,3 +85,5 @@ specific_ss.add(when: [x11, opengl, 'CONFIG_MILKYMIST_TMU2'], if_true: files('mi
 specific_ss.add(when: 'CONFIG_OMAP', if_true: files('omap_lcdc.c'))
 
 modules += { 'hw-display': hw_display_modules }
+
+softmmu_ss.add(files('jdi-lpm013m126c.c'))

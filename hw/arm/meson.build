@@ -57,4 +57,19 @@ arm_ss.add(when: 'CONFIG_ARM_SMMUV3', if_true: files('smmu-common.c', 'smmuv3.c'
 arm_ss.add(when: 'CONFIG_FSL_IMX6UL', if_true: files('fsl-imx6ul.c', 'mcimx6ul-evk.c'))
 arm_ss.add(when: 'CONFIG_NRF51_SOC', if_true: files('nrf51_soc.c'))
 
+arm_ss.add(files('amazfit.c'))
+arm_ss.add(files('stm32l467_soc.c'))
+arm_ss.add(files('stm32l476_flash.c'))
+arm_ss.add(files('stm32l476_lptim.c'))
+arm_ss.add(files('stm32l476_pwr.c'))
+arm_ss.add(files('stm32l476_rcc.c'))
+arm_ss.add(files('stm32l476_dma.c'))
+arm_ss.add(files('stm32l476_spi.c'))
+arm_ss.add(files('stm32l476_qspi.c'))
+arm_ss.add(files('stm32l476_gpio.c'))
+arm_ss.add(files('stm32l476_syscfg.c'))
+arm_ss.add(files('stm32l476_i2c.c'))
+arm_ss.add(files('it7259.c'))
+
+
 hw_arch += {'arm': arm_ss}
