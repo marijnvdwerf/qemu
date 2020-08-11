@@ -58,19 +58,21 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
 
     memory_region_init_rom(&s->flash, OBJECT(dev_soc), "STM32L467.flash",
                            FLASH_SIZE, &error_fatal);
-    memory_region_add_subregion(system_memory, FLASH_BASE_ADDRESS, &s->flash);
+
+    memory_region_init_alias(&s->flash_alias,
+                             OBJECT(dev_soc),
+                             "alias",
+                             &s->flash,
+                             0,
+                             FLASH_SIZE);
+    memory_region_add_subregion(system_memory, 0, &s->flash);
+    memory_region_add_subregion(system_memory, FLASH_BASE_ADDRESS, &s->flash_alias);
 
     memory_region_init_ram(&s->sram1, OBJECT(dev_soc), "STM32F205.sram1", 96 * 1024, &error_fatal);
     memory_region_add_subregion(system_memory, 0x20000000, &s->sram1);
 
     memory_region_init_ram(&s->sram2, OBJECT(dev_soc), "STM32F205.sram2", 32 * 1024, &error_fatal);
     memory_region_add_subregion(system_memory, 0x10000000, &s->sram2);
-
-    // alias memory so correct interrupt vector gets loaded
-    memory_region_init_io(&s->ivt_alias, NULL, &mv88w8618_wlan_ops, NULL,
-                          "musicpal-wlan", 0x100);
-    memory_region_init_alias(&s->ivt_alias,OBJECT(dev_soc), "alias", system_memory, FLASH_BASE_ADDRESS+0x11000, 0x100);
-    memory_region_add_subregion(system_memory, 0, &s->ivt_alias);
 
     DeviceState *armv7m = DEVICE(&s->armv7m);
     qdev_prop_set_string(armv7m, "cpu-type", ARM_CPU_TYPE_NAME("cortex-m4"));
@@ -82,6 +84,7 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
         return;
     }
 
+    system_clock_scale = 1000;
 }
 
 static Property stm32l467_soc_properties[] = {

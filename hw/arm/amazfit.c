@@ -21,12 +21,8 @@ static void bip_init(MachineState *machine) {
     dev = qdev_create(NULL, TYPE_STM32L467_SOC);
     object_property_set_bool(OBJECT(dev), true, "realized", &error_fatal);
 
-    load_image_targphys("/Users/Marijn/temp/chaohu_bootloader.fw",
+    load_image_targphys("/Users/Marijn/Downloads/bip/image.bin",
                         0,
-                        0x200);
-
-    load_image_targphys("/Users/Marijn/Downloads/chaohu_1.1.6.44_ft9_0/chaohu_v1.1.6.44.fw",
-                        FLASH_BASE_ADDRESS + 0x8000,
                         FLASH_SIZE);
 
     armv7m_load_kernel(ARM_CPU(first_cpu), NULL, 0);
