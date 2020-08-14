@@ -13,6 +13,14 @@
 
 #include "hw/arm/stm32l467_soc.h"
 
+#define PERIPH_BASE 0x40000000UL
+#define APB1PERIPH_BASE        PERIPH_BASE
+#define APB2PERIPH_BASE       (PERIPH_BASE + 0x00010000UL)
+#define AHB1PERIPH_BASE       (PERIPH_BASE + 0x00020000UL)
+#define AHB2PERIPH_BASE       (PERIPH_BASE + 0x08000000UL)
+
+#define FLASH_R_BASE          (AHB1PERIPH_BASE + 0x2000UL)
+
 static uint64_t mv88w8618_wlan_read(void *opaque, hwaddr offset,
                                     unsigned size) {
     printf("read @ 0x%x\n", offset);
@@ -46,6 +54,8 @@ static void stm32l467_soc_initfn(Object *obj) {
     sysbus_init_child_obj(obj, "armv7m", &s->armv7m, sizeof(s->armv7m),
                           TYPE_ARMV7M);
 
+    sysbus_init_child_obj(obj, "flash", &s->flash_r, sizeof(s->flash_r),
+                          TYPE_STM32L476_FLASH);
 }
 
 static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
@@ -83,6 +93,11 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
         error_propagate(errp, err);
         return;
     }
+
+    /* FLASH registers */
+    object_property_set_bool(OBJECT(&s->flash_r), true, "realized", &err);
+    SysBusDevice *busdev = SYS_BUS_DEVICE(&s->flash_r);
+    sysbus_mmio_map(busdev, 0, FLASH_R_BASE);
 
     system_clock_scale = 1000;
 }
