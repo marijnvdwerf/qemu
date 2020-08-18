@@ -3,6 +3,9 @@
 
 #include "hw/arm/armv7m.h"
 #include "hw/arm/stm32l476_flash.h"
+#include "hw/arm/stm32l476_lptim.h"
+#include "hw/arm/stm32l476_pwr.h"
+#include "hw/arm/stm32l476_rcc.h"
 
 #define TYPE_STM32L467_SOC "stm32l467-soc"
 #define STM32L467_SOC(obj) \
@@ -18,6 +21,9 @@ typedef struct STM32L467State {
     char *cpu_type;
 
     ARMv7MState armv7m;
+    STM32L476PwrState pwr;
+    STM32L476LPTimState lptim1;
+    STM32L476RccState rcc;
     STM32L476FlashState flash_r;
     MemoryRegion flash_alias;
     MemoryRegion flash;

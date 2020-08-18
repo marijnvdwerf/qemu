@@ -57,3 +57,6 @@ obj-$(CONFIG_NRF51_SOC) += nrf51_soc.o
 obj-y += amazfit.o
 obj-y += stm32l467_soc.o
 obj-y += stm32l476_flash.o
+obj-y += stm32l476_lptim.o
+obj-y += stm32l476_pwr.o
+obj-y += stm32l476_rcc.o
