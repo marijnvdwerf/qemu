@@ -2638,7 +2638,7 @@ static void armv7m_nvic_realize(DeviceState *dev, Error **errp)
     /* include space for internal exception vectors */
     s->num_irq += NVIC_FIRST_IRQ;
 
-    s->num_prio_bits = arm_feature(&s->cpu->env, ARM_FEATURE_V7) ? 8 : 2;
+    s->num_prio_bits = 4;
 
     object_property_set_bool(OBJECT(&s->systick[M_REG_NS]), true,
                              "realized", &err);
