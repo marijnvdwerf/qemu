@@ -13,17 +13,36 @@ typedef struct {
 
     /* <public> */
     MemoryRegion mmio;
+    qemu_irq irq;
+
+    int64_t start;
+    QEMUTimer *timer;
 
     // ISR
-   bool CMPM;
-   bool ARRM;
-   bool EXTTRIG;
-   bool CMPOK;
-   bool ARROK;
-   bool UP;
-   bool DOWN;
+    bool CMPM;
+    bool ARRM;
+    bool EXTTRIG;
+    bool CMPOK;
+    bool ARROK;
+    bool UP;
+    bool DOWN;
 
-   uint16_t ARR;
+    // IER:
+    bool CMPMIE;
+    bool ARRMIE;
+    bool EXTTRIGIE;
+    bool CMPOKIE;
+    bool ARROKIE;
+    bool UPIE;
+    bool DOWNIE;
+
+    // CR
+    bool ENABLE;
+    bool SNGSTRT;
+    bool CNTSTRT;
+
+    uint16_t CNT;
+    uint16_t ARR;
 } STM32L476LPTimState;
 
 #endif

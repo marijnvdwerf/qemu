@@ -161,6 +161,8 @@
 #define USB_OTG_FIFO_BASE                    (0x00001000UL)
 #define USB_OTG_FIFO_SIZE                    (0x00001000UL)
 
+#define LPTIM1_IRQn 65
+
 static uint64_t mv88w8618_wlan_read(void *opaque, hwaddr offset,
                                     unsigned size) {
     printf("read @ 0x%x\n", offset);
@@ -236,6 +238,7 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
 
     DeviceState *armv7m = DEVICE(&s->armv7m);
     qdev_prop_set_string(armv7m, "cpu-type", ARM_CPU_TYPE_NAME("cortex-m4"));
+    qdev_prop_set_uint32(armv7m, "num-irq", 82);
     object_property_set_link(OBJECT(&s->armv7m), OBJECT(system_memory),
                              "memory", &error_abort);
     object_property_set_bool(OBJECT(&s->armv7m), true, "realized", &err);
@@ -253,6 +256,7 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
     object_property_set_bool(OBJECT(&s->lptim1), true, "realized", &err);
     busdev = SYS_BUS_DEVICE(&s->lptim1);
     sysbus_mmio_map(busdev, 0, LPTIM1_BASE);
+    sysbus_connect_irq(busdev, 0, qdev_get_gpio_in(armv7m, LPTIM1_IRQn));
 
     /* RCC registers */
     object_property_set_bool(OBJECT(&s->rcc), true, "realized", &err);
