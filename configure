@@ -490,6 +490,7 @@ tpm=""
 libssh=""
 live_block_migration="yes"
 numa=""
+mouse="yes"
 tcmalloc="no"
 jemalloc="no"
 replication="yes"
@@ -1497,9 +1498,13 @@ for opt do
   ;;
   --enable-numa) numa="yes"
   ;;
+<<<<<<< HEAD
   --disable-libxml2) libxml2="no"
   ;;
   --enable-libxml2) libxml2="yes"
+=======
+  --disable-mouse) mouse="no"
+>>>>>>> 919b29ba7d... Pebble Qemu
   ;;
   --disable-tcmalloc) tcmalloc="no"
   ;;
@@ -6252,6 +6257,13 @@ esac
 
 
 ##########################################
+# check for mouse support
+
+if test "$mouse" = "no"; then
+  CFLAGS="-DNO_MOUSE $CFLAGS"
+fi
+
+##########################################
 # End of CC checks
 # After here, no more $cc or $ld runs
 
@@ -6713,6 +6725,7 @@ echo "NUMA host support $numa"
 echo "libxml2           $libxml2"
 echo "tcmalloc support  $tcmalloc"
 echo "jemalloc support  $jemalloc"
+<<<<<<< HEAD
 echo "avx2 optimization $avx2_opt"
 echo "avx512f optimization $avx512f_opt"
 echo "replication support $replication"
@@ -6746,6 +6759,9 @@ if test "$supported_cpu" = "no"; then
     echo "if you care about QEMU on this platform you should contact"
     echo "us upstream at qemu-devel@nongnu.org."
 fi
+=======
+echo "Mouse support     $mouse"
+>>>>>>> 919b29ba7d... Pebble Qemu
 
 if test "$supported_os" = "no"; then
     echo

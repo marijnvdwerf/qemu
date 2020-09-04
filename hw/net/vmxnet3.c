@@ -1958,6 +1958,14 @@ vmxnet3_receive(NetClientState *nc, const uint8_t *buf, size_t size)
         return -1;
     }
 
+    /* Pad to minimum Ethernet frame length */
+    if (size < sizeof(min_buf)) {
+        memcpy(min_buf, buf, size);
+        memset(&min_buf[size], 0, sizeof(min_buf) - size);
+        buf = min_buf;
+        size = sizeof(min_buf);
+    }
+
     if (s->peer_has_vhdr) {
         net_rx_pkt_set_vhdr(s->rx_pkt, (struct virtio_net_hdr *)buf);
         buf += sizeof(struct virtio_net_hdr);

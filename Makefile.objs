@@ -1,8 +1,14 @@
 #######################################################################
 # Common libraries for tools and emulators
 stub-obj-y = stubs/
+<<<<<<< HEAD
 util-obj-y = crypto/ util/ qobject/ qapi/
 qom-obj-y = qom/
+=======
+util-obj-y = util/ qobject/ qapi/
+util-obj-y += crypto/
+util-obj-y += qmp-introspect.o qapi-types.o qapi-visit.o qapi-event.o
+>>>>>>> 919b29ba7d... Pebble Qemu
 
 #######################################################################
 # code used by both qemu system emulation and qemu-img
@@ -35,6 +41,14 @@ storage-daemon-obj-y = block/ monitor/ qapi/ qom/ storage-daemon/
 storage-daemon-obj-y += blockdev.o blockdev-nbd.o iothread.o job-qmp.o
 storage-daemon-obj-$(CONFIG_WIN32) += os-win32.o
 storage-daemon-obj-$(CONFIG_POSIX) += os-posix.o
+
+crypto-obj-y = crypto/
+crypto-aes-obj-y = crypto/
+
+#######################################################################
+# qom-obj-y is code used by both qemu system emulation and qemu-img
+
+qom-obj-y = qom/
 
 ######################################################################
 # Target independent part of system emulation. The long term path is to

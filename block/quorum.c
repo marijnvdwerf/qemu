@@ -929,6 +929,7 @@ static int quorum_open(BlockDriverState *bs, QDict *options, int flags,
     }
 
     s->threshold = qemu_opt_get_number(opts, QUORUM_OPT_VOTE_THRESHOLD, 0);
+<<<<<<< HEAD
     /* and validate it against s->num_children */
     ret = quorum_valid_threshold(s->threshold, s->num_children, &local_err);
     if (ret < 0) {
@@ -942,6 +943,9 @@ static int quorum_open(BlockDriverState *bs, QDict *options, int flags,
         ret = qapi_enum_parse(&QuorumReadPattern_lookup, pattern_str,
                               -EINVAL, NULL);
     }
+=======
+    ret = parse_read_pattern(qemu_opt_get(opts, QUORUM_OPT_READ_PATTERN));
+>>>>>>> 919b29ba7d... Pebble Qemu
     if (ret < 0) {
         error_setg(&local_err, "Please set read-pattern as fifo or quorum");
         goto exit;

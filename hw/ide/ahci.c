@@ -1308,11 +1308,41 @@ static int handle_cmd(AHCIState *s, int port, uint8_t slot)
         trace_handle_cmd_badmap(s, port, cmd_len);
         goto out;
     }
+<<<<<<< HEAD
     if (trace_event_get_state_backends(TRACE_HANDLE_CMD_FIS_DUMP)) {
         char *pretty_fis = ahci_pretty_buffer_fis(cmd_fis, 0x80);
         trace_handle_cmd_fis_dump(s, port, pretty_fis);
         g_free(pretty_fis);
     }
+=======
+    cmd = get_cmd_header(s, port, slot);
+    /* remember current slot handle for later */
+    s->dev[port].cur_cmd = cmd;
+
+    /* The device we are working for */
+    ide_state = &s->dev[port].port.ifs[0];
+    if (!ide_state->blk) {
+        DPRINTF(port, "error: guest accessed unused port");
+        return -1;
+    }
+
+    tbl_addr = le64_to_cpu(cmd->tbl_addr);
+    cmd_len = 0x80;
+    cmd_fis = dma_memory_map(s->as, tbl_addr, &cmd_len,
+                             DMA_DIRECTION_FROM_DEVICE);
+    if (!cmd_fis) {
+        DPRINTF(port, "error: guest passed us an invalid cmd fis\n");
+        return -1;
+    } else if (cmd_len != 0x80) {
+        ahci_trigger_irq(s, &s->dev[port], PORT_IRQ_HBUS_ERR);
+        DPRINTF(port, "error: dma_memory_map failed: "
+                "(len(%02"PRIx64") != 0x80)\n",
+                cmd_len);
+        goto out;
+    }
+    debug_print_fis(cmd_fis, 0x80);
+
+>>>>>>> 919b29ba7d... Pebble Qemu
     switch (cmd_fis[0]) {
         case SATA_FIS_TYPE_REGISTER_H2D:
             handle_reg_h2d_fis(s, port, slot, cmd_fis);

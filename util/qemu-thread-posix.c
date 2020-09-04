@@ -541,11 +541,15 @@ void qemu_thread_create(QemuThread *thread, const char *name,
 
     /* Leave signal handling to the iothread.  */
     sigfillset(&set);
+<<<<<<< HEAD
     /* Blocking the signals can result in undefined behaviour. */
     sigdelset(&set, SIGSEGV);
     sigdelset(&set, SIGFPE);
     sigdelset(&set, SIGILL);
     /* TODO avoid SIGBUS loss on macOS */
+=======
+    sigemptyset(&oldset); /* keeps valgrind happy */
+>>>>>>> 919b29ba7d... Pebble Qemu
     pthread_sigmask(SIG_SETMASK, &set, &oldset);
 
     qemu_thread_args = g_new0(QemuThreadArgs, 1);

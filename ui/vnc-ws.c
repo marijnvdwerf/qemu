@@ -45,6 +45,37 @@ static void vncws_tls_handshake_done(QIOTask *task,
     }
 }
 
+<<<<<<< HEAD
+=======
+void vncws_tls_handshake_io(void *opaque)
+{
+    VncState *vs = (VncState *)opaque;
+    Error *err = NULL;
+
+    if (!vs->tls) {
+        vs->tls = qcrypto_tls_session_new(vs->vd->tlscreds,
+                                          NULL,
+                                          vs->vd->tlsaclname,
+                                          QCRYPTO_TLS_CREDS_ENDPOINT_SERVER,
+                                          &err);
+    }
+    if (!vs->tls) {
+        VNC_DEBUG("Failed to setup TLS %s\n",
+                  error_get_pretty(err));
+        error_free(err);
+        vnc_client_error(vs);
+        return;
+    }
+
+    qcrypto_tls_session_set_callbacks(vs->tls,
+                                      vnc_tls_push,
+                                      vnc_tls_pull,
+                                      vs);
+
+    VNC_DEBUG("Start TLS WS handshake process\n");
+    vncws_start_tls_handshake(vs);
+}
+>>>>>>> 919b29ba7d... Pebble Qemu
 
 gboolean vncws_tls_handshake_io(QIOChannel *ioc G_GNUC_UNUSED,
                                 GIOCondition condition G_GNUC_UNUSED,

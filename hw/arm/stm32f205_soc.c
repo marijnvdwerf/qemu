@@ -105,6 +105,7 @@ static void stm32f205_soc_realize(DeviceState *dev_soc, Error **errp)
                            &error_fatal);
     memory_region_add_subregion(system_memory, SRAM_BASE_ADDRESS, sram);
 
+<<<<<<< HEAD
     armv7m = DEVICE(&s->armv7m);
     qdev_prop_set_uint32(armv7m, "num-irq", 96);
     qdev_prop_set_string(armv7m, "cpu-type", s->cpu_type);
@@ -116,6 +117,10 @@ static void stm32f205_soc_realize(DeviceState *dev_soc, Error **errp)
         error_propagate(errp, err);
         return;
     }
+=======
+    nvic = armv7m_init(/* no parent */ NULL, get_system_memory(), FLASH_SIZE, SRAM_SIZE, 96,
+                       s->kernel_filename, s->cpu_model);
+>>>>>>> 919b29ba7d... Pebble Qemu
 
     /* System configuration controller */
     dev = DEVICE(&s->syscfg);
