@@ -12,12 +12,7 @@
 #include "qapi/error.h"
 #include "cpu.h"
 #include "hw/sysbus.h"
-<<<<<<< HEAD
 #include "hw/arm/boot.h"
-=======
-#include "hw/arm/arm.h"
-#include "hw/arm/stm32.h"
->>>>>>> 919b29ba7d... Pebble Qemu
 #include "hw/loader.h"
 #include "hw/qdev-properties.h"
 #include "elf.h"
@@ -274,7 +269,6 @@ static void armv7m_realize(DeviceState *dev, Error **errp)
     }
 }
 
-<<<<<<< HEAD
 static Property armv7m_properties[] = {
     DEFINE_PROP_STRING("cpu-type", ARMv7MState, cpu_type),
     DEFINE_PROP_LINK("memory", ARMv7MState, board_memory, TYPE_MEMORY_REGION,
@@ -295,27 +289,6 @@ static void armv7m_class_init(ObjectClass *klass, void *data)
 
     dc->realize = armv7m_realize;
     device_class_set_props(dc, armv7m_properties);
-=======
-static void armv7m_bitband_init(Object *parent)
-{
-    DeviceState *dev;
-
-    dev = qdev_create(NULL, TYPE_BITBAND);
-    qdev_prop_set_uint32(dev, "base", 0x20000000);
-    if(parent) {
-        object_property_add_child(parent, "bitband-sram", OBJECT(dev), NULL);
-    }
-    qdev_init_nofail(dev);
-    sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0x22000000);
-
-    dev = qdev_create(NULL, TYPE_BITBAND);
-    qdev_prop_set_uint32(dev, "base", 0x40000000);
-    if(parent) {
-        object_property_add_child(parent, "bitband-periph", OBJECT(dev), NULL);
-    }
-    qdev_init_nofail(dev);
-    sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0x42000000);
->>>>>>> 919b29ba7d... Pebble Qemu
 }
 
 static const TypeInfo armv7m_info = {
@@ -333,121 +306,15 @@ static void armv7m_reset(void *opaque)
     cpu_reset(CPU(cpu));
 }
 
-<<<<<<< HEAD
 void armv7m_load_kernel(ARMCPU *cpu, const char *kernel_filename, int mem_size)
 {
-=======
-/* Init CPU and memory for a v7-M based board.
-   flash_size and sram_size are in bytes.
-   Returns the NVIC array.  */
-
-
-DeviceState *armv7m_init(Object *parent, MemoryRegion *system_memory,
-                      int flash_size, int sram_size, int num_irq,
-                      const char *kernel_filename, const char *cpu_model)
-{
-    ARMCPU *cpu;
-    return armv7m_translated_init(parent, system_memory, flash_size, sram_size, num_irq,
-            kernel_filename, NULL, NULL, cpu_model, &cpu);
-}
-
-DeviceState *armv7m_translated_init(Object *parent, MemoryRegion *system_memory,
-                                 int flash_size, int sram_size, int num_irq,
-                                 const char *kernel_filename,
-                                 uint64_t (*translate_fn)(void *, uint64_t),
-                                 void *translate_opaque,
-                                 const char *cpu_model,
-                                 ARMCPU **cpu_device)
-{
-    ARMCPU *cpu;
-    CPUARMState *env;
-    DeviceState *nvic;
-    if (num_irq == 0) {
-        num_irq = STM32_MAX_IRQ + 1;
-    }
->>>>>>> 919b29ba7d... Pebble Qemu
     int image_size;
     uint64_t entry;
     uint64_t lowaddr;
     int big_endian;
-<<<<<<< HEAD
     AddressSpace *as;
     int asidx;
     CPUState *cs = CPU(cpu);
-=======
-    MemoryRegion *hack = g_new(MemoryRegion, 1);
-    MemoryRegion *flash = NULL;
-    MemoryRegion *sram = g_new(MemoryRegion, 1);
-    ObjectClass *cpu_oc;
-    Error *err = NULL;
-
-    if (kernel_filename) {
-        flash = g_new(MemoryRegion, 1);
-    }
-
-    if (cpu_model == NULL) {
-        cpu_model = "cortex-m3";
-    }
-    cpu_oc = cpu_class_by_name(TYPE_ARM_CPU, cpu_model);
-    cpu = ARM_CPU(object_new(object_class_get_name(cpu_oc)));
-    if (cpu == NULL) {
-        fprintf(stderr, "Unable to find CPU definition\n");
-        exit(1);
-    }
-    /* On Cortex-M3/M4, the MPU has 8 windows */
-    object_property_set_int(OBJECT(cpu), 8, "pmsav7-dregion", &err);
-    if (err) {
-        error_report_err(err);
-        exit(1);
-    }
-    object_property_set_bool(OBJECT(cpu), true, "realized", &err);
-    if (err) {
-        error_report_err(err);
-        exit(1);
-    }
-    *cpu_device = cpu;
-    env = &cpu->env;
-
-    if (kernel_filename) {
-        memory_region_init_ram(flash, NULL, "armv7m.flash", flash_size, &err);
-        vmstate_register_ram_global(flash);
-        memory_region_set_readonly(flash, true);
-        memory_region_add_subregion(system_memory, 0, flash);
-    }
-
-    if (sram_size) {
-        memory_region_init_ram(sram, NULL, "armv7m.sram", sram_size, &err);
-        vmstate_register_ram_global(sram);
-        memory_region_add_subregion(system_memory, 0x20000000, sram);
-    }
-    armv7m_bitband_init(parent);
-
-    /* If this is an M4, create the core-coupled memory region */
-    if (!strcmp(cpu_model, "cortex-m4")) {
-        MemoryRegion *ccm = g_new(MemoryRegion, 1);
-        memory_region_init_ram(ccm, NULL, "armv7m.ccm", 64 * 1024 /* 64K */, &err);
-        vmstate_register_ram_global(ccm);
-        memory_region_add_subregion(system_memory, 0x10000000, ccm);
-    }
-
-    nvic = qdev_create(NULL, "armv7m_nvic");
-    qdev_prop_set_uint32(nvic, "num-irq", num_irq);
-    env->nvic = nvic;
-    if(parent) {
-        object_property_add_child(parent, "nvic", OBJECT(nvic), NULL);
-    }
-    qdev_init_nofail(nvic);
-
-    // Connect the nvic's CPU #0 "parent_irq" output to the CPU's IRQ input handler
-    sysbus_connect_irq(SYS_BUS_DEVICE(nvic), 0,
-                       qdev_get_gpio_in(DEVICE(cpu), ARM_CPU_IRQ));
->>>>>>> 919b29ba7d... Pebble Qemu
-
-    // Connect the nvic's "wakeup_out" output to the CPU's WKUP input handler
-    qemu_irq cpu_wakeup_in = qdev_get_gpio_in(DEVICE(cpu), ARM_CPU_WKUP);
-    qdev_connect_gpio_out_named(DEVICE(nvic), "wakeup_out", 0, cpu_wakeup_in);
-
-
 
 #ifdef TARGET_WORDS_BIGENDIAN
     big_endian = 1;
@@ -455,7 +322,6 @@ DeviceState *armv7m_translated_init(Object *parent, MemoryRegion *system_memory,
     big_endian = 0;
 #endif
 
-<<<<<<< HEAD
     if (arm_feature(&cpu->env, ARM_FEATURE_EL3)) {
         asidx = ARMASIdx_S;
     } else {
@@ -470,13 +336,6 @@ DeviceState *armv7m_translated_init(Object *parent, MemoryRegion *system_memory,
         if (image_size < 0) {
             image_size = load_image_targphys_as(kernel_filename, 0,
                                                 mem_size, as);
-=======
-    if (kernel_filename) {
-        image_size = load_elf(kernel_filename, translate_fn, translate_opaque, &entry, &lowaddr,
-                              NULL, big_endian, EM_ARM, 1);
-        if (image_size < 0) {
-            image_size = load_image_targphys(kernel_filename, 0, flash_size);
->>>>>>> 919b29ba7d... Pebble Qemu
             lowaddr = 0;
         }
         if (image_size < 0) {

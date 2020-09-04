@@ -20,7 +20,8 @@
  * SOFTWARE.
  */
 
-#include "hw/ssi.h"
+#include "qemu/osdep.h"
+#include "hw/ssi/ssi.h"
 #include "hw/boards.h"
 #include "hw/block/flash.h"
 #include "sysemu/sysemu.h"
@@ -28,6 +29,9 @@
 #include "ui/console.h"
 #include "pebble_control.h"
 #include "pebble.h"
+#include "hw/qdev-properties.h"
+#include "hw/irq.h"
+#include "qapi/error.h"
 
 // Disable jiggling the display when Pebble vibration is on.
 //#define PEBBLE_NO_DISPLAY_VIBRATE
@@ -251,10 +255,10 @@ void pebble_connect_uarts(Stm32Uart *uart[], const PblBoardConfig *board_config)
     // This UART is used for control messages, put in our pebble_control device in between
     // the qemu serial chr and the uart. This enables us to intercept and act selectively
     // act on messages sent to the Pebble in QEMU before they get to it.
-    s_pebble_control = pebble_control_create(serial_hds[1],
+    s_pebble_control = pebble_control_create(serial_hd(1),
                                              uart[board_config->pebble_control_uart_index]);
 
-    stm32_uart_connect(uart[board_config->dbgserial_uart_index], serial_hds[2], 0);
+    stm32_uart_connect(uart[board_config->dbgserial_uart_index], serial_hd(2), 0);
 }
 
 void pebble_connect_uarts_stm32f7xx(Stm32F7xxUart *uart[], const PblBoardConfig *board_config)
@@ -262,10 +266,10 @@ void pebble_connect_uarts_stm32f7xx(Stm32F7xxUart *uart[], const PblBoardConfig 
     // This UART is used for control messages, put in our pebble_control device in between
     // the qemu serial chr and the uart. This enables us to intercept and act selectively
     // act on messages sent to the Pebble in QEMU before they get to it.
-    s_pebble_control = pebble_control_create_stm32f7xx(serial_hds[1],
+    s_pebble_control = pebble_control_create_stm32f7xx(serial_hd(1),
             uart[board_config->pebble_control_uart_index]);
 
-    stm32f7xx_uart_connect(uart[board_config->dbgserial_uart_index], serial_hds[2], 0);
+    stm32f7xx_uart_connect(uart[board_config->dbgserial_uart_index], serial_hd(2), 0);
 }
 
 
@@ -388,6 +392,12 @@ static void pebble_32f2_init(MachineState *machine, const PblBoardConfig *board_
     /* SPI flash */
     spi = (SSIBus *)qdev_get_child_bus(stm.spi_dev[0], "ssi");
     spi_flash = ssi_create_slave_no_init(spi, "n25q032a11");
+    DriveInfo *dinfo = drive_get_next(IF_MTD);
+    if (dinfo) {
+        qdev_prop_set_drive(spi_flash, "drive",
+                            blk_by_legacy_dinfo(dinfo),
+                            &error_fatal);
+    }
     qdev_init_nofail(spi_flash);
 
     qemu_irq cs;
@@ -413,8 +423,8 @@ static void pebble_32f2_init(MachineState *machine, const PblBoardConfig *board_
 
     qemu_irq display_power;
     display_power = qdev_get_gpio_in_named(display_dev, "power_ctl", 0);
-    qdev_connect_gpio_out_named((DeviceState *)cpu->env.nvic, "power_out", 0,
-                                  display_power);
+//NVIC    qdev_connect_gpio_out_named((DeviceState *)cpu->env.nvic, "power_out", 0,
+//NVIC                                  display_power);
 
     // Connect up the uarts
     pebble_connect_uarts(uart, board_config);
@@ -534,8 +544,8 @@ void pebble_32f439_init(MachineState *machine, const PblBoardConfig *board_confi
 
     qemu_irq display_power;
     display_power = qdev_get_gpio_in_named(display_dev, "power_ctl", 0);
-    qdev_connect_gpio_out_named((DeviceState *)cpu->env.nvic, "power_out", 0,
-                                  display_power);
+//NVIC    qdev_connect_gpio_out_named((DeviceState *)cpu->env.nvic, "power_out", 0,
+//                                  display_power);
 
 
     // Connect up the uarts
@@ -585,15 +595,13 @@ static void pebble_board_vibe_ctl(void *opaque, int n, int level)
 }
 
 
-static int pebble_board_init(SysBusDevice *dev)
+static void pebble_board_init(Object *dev)
 {
     //PebbleBoard *s = FROM_SYSBUS(PebbleBoard, dev);
 
     /* This callback informs us that the vibrate is on/orr */
     qdev_init_gpio_in_named(DEVICE(dev), pebble_board_vibe_ctl,
                             "pebble_board_vibe_in", 1);
-
-    return 0;
 }
 
 static Property pebble_board_properties[] = {
@@ -605,15 +613,15 @@ static Property pebble_board_properties[] = {
 static void pebble_board_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(klass);
-    sc->init = pebble_board_init;
-    dc->props = pebble_board_properties;
+
+    device_class_set_props(dc, pebble_board_properties);
 }
 
 static const TypeInfo pebble_board_info = {
     .name          = "pebble_board",
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(PebbleBoard),
+    .instance_init = pebble_board_init,
     .class_init    = pebble_board_class_init,
 };
 

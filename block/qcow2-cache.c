@@ -308,12 +308,8 @@ int qcow2_cache_empty(BlockDriverState *bs, Qcow2Cache *c)
         c->entries[i].offset = 0;
         c->entries[i].lru_counter = 0;
     }
-<<<<<<< HEAD
 
     qcow2_cache_table_release(c, 0, c->size);
-=======
-    qcow2_cache_table_release(bs, c, 0, c->size);
->>>>>>> 919b29ba7d... Pebble Qemu
 
     c->lru_counter = 0;
 

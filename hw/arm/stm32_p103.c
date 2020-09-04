@@ -20,13 +20,14 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "stm32f1xx.h"
 #include "hw/sysbus.h"
-#include "hw/arm/arm.h"
-#include "hw/devices.h"
+#include "hw/arm/armv7m.h"
 #include "ui/console.h"
 #include "sysemu/sysemu.h"
 #include "hw/boards.h"
+#include "hw/irq.h"
 
 
 typedef struct {
@@ -121,7 +122,7 @@ static void stm32_p103_init(MachineState *machine) {
     /* Connect RS232 to UART */
     stm32_uart_connect(
             s->stm32_uart[STM32_UART2_INDEX],
-            serial_hds[0],
+            serial_hd(0),
             STM32_USART2_NO_REMAP);
 }
 

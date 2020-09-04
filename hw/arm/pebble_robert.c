@@ -1,7 +1,8 @@
+#include "qemu/osdep.h"
 #include "pebble.h"
 #include "hw/boards.h"
-#include "hw/ssi.h"
-
+#include "hw/ssi/ssi.h"
+#include "hw/qdev-properties.h"
 
 const static PblBoardConfig s_board_config_robert_bb = {
     .dbgserial_uart_index = 2,       // USART3
@@ -112,8 +113,8 @@ void pebble_32f7xx_init(MachineState *machine, const PblBoardConfig *board_confi
 
     qemu_irq display_power;
     display_power = qdev_get_gpio_in_named(display_dev, "power_ctl", 0);
-    qdev_connect_gpio_out_named((DeviceState *)cpu->env.nvic, "power_out", 0,
-                                  display_power);
+//NVIC    qdev_connect_gpio_out_named((DeviceState *)cpu->env.nvic, "power_out", 0,
+//NVIC                                  display_power);
 
     // Connect up the uarts
     pebble_connect_uarts_stm32f7xx(uart, board_config);

@@ -20,9 +20,13 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/arm/stm32.h"
 #include "qemu/bitops.h"
+#include "hw/qdev-properties.h"
+#include "hw/irq.h"
+#include "hw/hw.h"
 
 
 
@@ -306,10 +310,11 @@ uint8_t stm32_gpio_get_mode_bits(Stm32Gpio *s, unsigned pin) {
 
 /* DEVICE INITIALIZATION */
 
-static int stm32_gpio_init(SysBusDevice *dev)
+static void stm32_gpio_init(Object *obj)
 {
     unsigned pin;
-    Stm32Gpio *s = STM32_GPIO(dev);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    Stm32Gpio *s = STM32_GPIO(obj);
 
     s->stm32_rcc = (Stm32Rcc *)s->stm32_rcc_prop;
 
@@ -323,8 +328,6 @@ static int stm32_gpio_init(SysBusDevice *dev)
     for(pin = 0; pin < STM32_GPIO_PIN_COUNT; pin++) {
         sysbus_init_irq(dev, &s->in_irq[pin]);
     }
-
-    return 0;
 }
 
 static Property stm32_gpio_properties[] = {
@@ -338,15 +341,15 @@ static void stm32_gpio_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32_gpio_init;
     dc->reset = stm32_gpio_reset;
-    dc->props = stm32_gpio_properties;
+    device_class_set_props(dc, stm32_gpio_properties);
 }
 
 static TypeInfo stm32_gpio_info = {
     .name  = TYPE_STM32_GPIO,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size  = sizeof(Stm32Gpio),
+    .instance_init = stm32_gpio_init,
     .class_init = stm32_gpio_class_init
 };
 

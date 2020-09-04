@@ -662,13 +662,7 @@ void pc_cmos_init(PCMachineState *pcms,
     object_property_set_link(OBJECT(pcms), OBJECT(s),
                              "rtc_state", &error_abort);
 
-<<<<<<< HEAD
     set_boot_dev(s, MACHINE(pcms)->boot_order, &error_fatal);
-=======
-    set_boot_dev(s, MACHINE(pcms)->boot_order, &local_err);
-    if (local_err) {
-        error_report_err(local_err);
->>>>>>> 919b29ba7d... Pebble Qemu
 
     val = 0;
     val |= 0x02; /* FPU is there */

@@ -20,18 +20,21 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/arm/stm32.h"
-#include "hw/arm/stm32f1xx.h"
-#include "sysemu/char.h"
 #include "qemu/bitops.h"
+#include "hw/qdev-properties.h"
+#include "hw/arm/stm32f1xx.h"
+#include "hw/irq.h"
+#include "hw/hw.h"
 
 
 
 /* DEFINITIONS*/
 
 /* See the README file for details on these settings. */
-//#define DEBUG_STM32_UART
+#define DEBUG_STM32_UART
 //#define STM32_UART_NO_BAUD_DELAY
 //#define STM32_UART_ENABLE_OVERRUN
 
@@ -434,7 +437,7 @@ static int stm32_uart_can_receive(void *opaque)
     return (USART_RCV_BUF_LEN - s->rcv_char_bytes);
 }
 
-static void stm32_uart_event(void *opaque, int event)
+static void stm32_uart_event(void *opaque, QEMUChrEvent event)
 {
     /* Do nothing */
 }
@@ -758,12 +761,12 @@ void stm32_uart_get_rcv_handlers(Stm32Uart *s, IOCanReadHandler **can_read,
 // qemu_chr write handler.
 static int stm32_uart_chr_fe_write_stub(void *s, const uint8_t *buf, int len)
 {
-    return qemu_chr_fe_write((CharDriverState *)s, buf, len);
+    return qemu_chr_fe_write((Chardev *)s, buf, len);
 }
 
 
 // Helper method that connects this UART device's receive handlers to a qemu_chr instance.
-void stm32_uart_connect(Stm32Uart *s, CharDriverState *chr, uint32_t afio_board_map)
+void stm32_uart_connect(Stm32Uart *s, Chardev *chr, uint32_t afio_board_map)
 {
     s->chr_write_obj = chr;
     if (chr) {
@@ -772,7 +775,7 @@ void stm32_uart_connect(Stm32Uart *s, CharDriverState *chr, uint32_t afio_board_
         IOReadHandler *read_cb;
         IOEventHandler *event_cb;
         stm32_uart_get_rcv_handlers(s, &can_read_cb, &read_cb, &event_cb);
-        qemu_chr_add_handlers(chr, can_read_cb, read_cb, event_cb, s);
+        qemu_chr_fe_set_handlers(&chr, can_read_cb, read_cb, event_cb, NULL, s, NULL, true);
     }
 
     s->afio_board_map = afio_board_map;
@@ -783,10 +786,11 @@ void stm32_uart_connect(Stm32Uart *s, CharDriverState *chr, uint32_t afio_board_
 
 /* DEVICE INITIALIZATION */
 
-static int stm32_uart_init(SysBusDevice *dev)
+static void stm32_uart_realize(DeviceState *obj, Error **pError)
 {
     qemu_irq *clk_irq;
-    Stm32Uart *s = STM32_UART(dev);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    Stm32Uart *s = STM32_UART(obj);
 
     s->stm32_rcc = (Stm32Rcc *)s->stm32_rcc_prop;
     s->stm32_gpio = (Stm32Gpio **)s->stm32_gpio_prop;
@@ -813,8 +817,6 @@ static int stm32_uart_init(SysBusDevice *dev)
     s->rcv_char_bytes = 0;
 
     stm32_uart_reset((DeviceState *)s);
-
-    return 0;
 }
 
 static Property stm32_uart_properties[] = {
@@ -829,15 +831,14 @@ static Property stm32_uart_properties[] = {
 static void stm32_uart_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32_uart_init;
+    dc->realize = stm32_uart_realize;
     dc->reset = stm32_uart_reset;
-    dc->props = stm32_uart_properties;
+    device_class_set_props(dc, stm32_uart_properties);
 }
 
 static TypeInfo stm32_uart_info = {
-    .name  = "stm32-uart",
+    .name  = TYPE_STM32_UART,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size  = sizeof(Stm32Uart),
     .class_init = stm32_uart_class_init

@@ -19,9 +19,12 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/arm/stm32.h"
 #include "hw/arm/stm32f4xx.h"
 #include "qemu/bitops.h"
+#include "hw/irq.h"
+#include "hw/hw.h"
 
 
 
@@ -287,10 +290,11 @@ static void stm32_exti_reset(DeviceState *dev)
 
 /* DEVICE INITIALIZATION */
 
-static int stm32_exti_init(SysBusDevice *dev)
+static void stm32_exti_init(Object *obj)
 {
     int i;
 
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
     Stm32Exti *s = STM32_EXTI(dev);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &stm32_exti_ops, s,
@@ -303,8 +307,6 @@ static int stm32_exti_init(SysBusDevice *dev)
 
     /* Create the handlers to handle GPIO input pin changes. */
     qdev_init_gpio_in(DEVICE(dev), stm32_exti_gpio_in_handler, STM32_GPIO_PIN_COUNT);
-
-    return 0;
 }
 
 static void stm32_exti_class_init(ObjectClass *klass, void *data)
@@ -312,14 +314,14 @@ static void stm32_exti_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32_exti_init;
     dc->reset = stm32_exti_reset;
 }
 
 static TypeInfo stm32_exti_info = {
-    .name  = TYPE_STM32_EXTI,
+    .name  = TYPE_STM32_EXTI_ALT,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size  = sizeof(Stm32Exti),
+    .instance_init = stm32_exti_init,
     .class_init = stm32_exti_class_init
 };
 

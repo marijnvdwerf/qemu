@@ -43,7 +43,6 @@ obj-$(CONFIG_XLNX_ZYNQMP_ARM) += xlnx-zynqmp.o xlnx-zcu102.o
 obj-$(CONFIG_XLNX_VERSAL) += xlnx-versal.o xlnx-versal-virt.o
 obj-$(CONFIG_FSL_IMX25) += fsl-imx25.o imx25_pdk.o
 obj-$(CONFIG_FSL_IMX31) += fsl-imx31.o kzm.o
-<<<<<<< HEAD
 obj-$(CONFIG_FSL_IMX6) += fsl-imx6.o
 obj-$(CONFIG_ASPEED_SOC) += aspeed_soc.o aspeed.o aspeed_ast2600.o
 obj-$(CONFIG_MPS2) += mps2.o
@@ -55,7 +54,6 @@ obj-$(CONFIG_FSL_IMX7) += fsl-imx7.o mcimx7d-sabre.o
 obj-$(CONFIG_ARM_SMMUV3) += smmu-common.o smmuv3.o
 obj-$(CONFIG_FSL_IMX6UL) += fsl-imx6ul.o mcimx6ul-evk.o
 obj-$(CONFIG_NRF51_SOC) += nrf51_soc.o
-=======
 
 obj-y += stm32.o stm32_rcc.o stm32_clktree.o stm32_p103.o
 obj-y += stm32f1xx.o stm32f2xx.o stm32f4xx.o stm32f7xx.o stm32_flash.o
@@ -75,4 +73,3 @@ obj-y += pebble_control.o
 obj-y += pebble_robert.o
 obj-y += pebble_silk.o
 
->>>>>>> 919b29ba7d... Pebble Qemu

@@ -32,11 +32,7 @@ common-obj-$(CONFIG_MILKYMIST) += milkymist-uart.o
 common-obj-$(CONFIG_SCLPCONSOLE) += sclpconsole.o sclpconsole-lm.o
 
 obj-$(CONFIG_VIRTIO) += virtio-serial-bus.o
-<<<<<<< HEAD
 obj-$(CONFIG_PSERIES) += spapr_vty.o
 obj-$(CONFIG_TERMINAL3270) += terminal3270.o
-=======
-
-obj-$(CONFIG_STM32) += stm32_uart.o
-obj-$(CONFIG_STM32) += stm32f7xx_uart.o
->>>>>>> 919b29ba7d... Pebble Qemu
+obj-y += stm32_uart.o
+obj-y += stm32f7xx_uart.o

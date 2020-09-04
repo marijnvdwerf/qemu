@@ -1,6 +1,9 @@
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/arm/stm32.h"
-#include "hw/ssi.h"
+#include "hw/irq.h"
+#include "hw/qdev-properties.h"
+#include "hw/ssi/ssi.h"
 
 #ifndef STM32F412_QSPI_ERR_DEBUG
 #define STM32F412_QSPI_ERR_DEBUG 0
@@ -290,18 +293,18 @@ static const MemoryRegionOps stm32f412_qspi_ops = {
 static void
 stm32f412_qspi_reset(DeviceState *dev)
 {
-    struct stm32f412_qspi_s *s = FROM_SYSBUS(struct stm32f412_qspi_s,
-      SYS_BUS_DEVICE(dev));
+    struct stm32f412_qspi_s *s = STM32F412_QSPI(dev);
 
     //s->regs[R_SR] = R_SR_RESET;
     s->cs_state = CS_STATE_HIGH;
     s->tx_remaining = 0;
 }
 
-static int
-stm32f412_qspi_init(SysBusDevice *dev)
+static void
+stm32f412_qspi_init(Object *obj)
 {
-    struct stm32f412_qspi_s *s = FROM_SYSBUS(struct stm32f412_qspi_s, dev);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    struct stm32f412_qspi_s *s = STM32F412_QSPI(dev);
 
     memory_region_init_io(&s->iomem, NULL, &stm32f412_qspi_ops, s, "qspi", 0x3ff);
     sysbus_init_mmio(dev, &s->iomem);
@@ -312,8 +315,6 @@ stm32f412_qspi_init(SysBusDevice *dev)
     s->tx_remaining = 0;
 
     qdev_init_gpio_out_named(DEVICE(dev), &s->cs_irq, "qspi-gpio-cs", 1);
-
-    return 0;
 }
 
 static Property stm32f412_qspi_properties[] = {
@@ -324,17 +325,16 @@ static void
 stm32f412_qspi_class_init(ObjectClass *c, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(c);
-    SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(c);
 
-    sc->init = stm32f412_qspi_init;
     dc->reset = stm32f412_qspi_reset;
-    dc->props = stm32f412_qspi_properties;
+    device_class_set_props(dc, stm32f412_qspi_properties);
 }
 
 static const TypeInfo stm32f412_qspi_info = {
-    .name = "stm32f412_qspi",
+    .name = TYPE_STM32F412_QSPI,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(struct stm32f412_qspi_s),
+    .instance_init = stm32f412_qspi_init,
     .class_init = stm32f412_qspi_class_init
 };
 

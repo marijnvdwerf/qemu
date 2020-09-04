@@ -22,9 +22,13 @@
 /*
  * QEMU stm32f2xx RTC emulation
  */
+
+#include "qemu/osdep.h"
 #include <sys/time.h>
 #include "hw/sysbus.h"
 #include "qemu/timer.h"
+#include "hw/qdev-properties.h"
+#include "hw/arm/stm32.h"
 
 //#define DEBUG_STM32F2XX_PWR
 #ifdef DEBUG_STM32F2XX_PWR
@@ -140,24 +144,23 @@ bool f2xx_pwr_powerdown_deepsleep(void *opaqe)
 
 static void f2xx_pwr_reset(DeviceState *dev)
 {
-    f2xx_pwr *s = FROM_SYSBUS(f2xx_pwr, SYS_BUS_DEVICE(dev));
+    f2xx_pwr *s = STM32F2XX_PWR(dev);
 
     memset(s->regs, 0, sizeof(s->regs));
 }
 
 
-static int
-f2xx_pwr_init(SysBusDevice *dev)
+static void
+f2xx_pwr_init(Object *obj)
 {
-    f2xx_pwr *s = FROM_SYSBUS(f2xx_pwr, dev);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    f2xx_pwr *s = STM32F2XX_PWR(obj);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &f2xx_pwr_ops, s, "pwr", 0x08);
     sysbus_init_mmio(dev, &s->iomem);
 
     s->regs[R_PWR_CR] = 0;
     s->regs[R_PWR_CSR] = 0;
-
-    return 0;
 }
 
 static Property f2xx_pwr_properties[] = {
@@ -169,16 +172,16 @@ f2xx_pwr_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(klass);
-    sc->init = f2xx_pwr_init;
     dc->reset = f2xx_pwr_reset;
-    dc->props = f2xx_pwr_properties;
+    device_class_set_props(dc, f2xx_pwr_properties);
 }
 
 static const TypeInfo
 f2xx_pwr_info = {
-    .name          = "f2xx_pwr",
+    .name          = TYPE_STM32F2XX_PWR,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(f2xx_pwr),
+    .instance_init = f2xx_pwr_init,
     .class_init    = f2xx_pwr_class_init,
 };
 

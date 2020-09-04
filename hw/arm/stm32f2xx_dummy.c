@@ -22,7 +22,12 @@
 /*
  * QEMU dummy emulation
  */
+
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
+#include "qemu/log.h"
+#include "hw/qdev-properties.h"
+#include "hw/arm/stm32.h"
 
 typedef struct f2xx_dummy {
     SysBusDevice busdev;
@@ -62,14 +67,14 @@ static const MemoryRegionOps f2xx_dummy_ops = {
     }
 };
 
-static int
-f2xx_dummy_init(SysBusDevice *dev)
+static void
+f2xx_dummy_realize(DeviceState *obj, Error **pError)
 {
-    f2xx_dummy *s = FROM_SYSBUS(f2xx_dummy, dev);
+    f2xx_dummy *s = STM32F2XX_DUMMY(obj);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &f2xx_dummy_ops, s, "dummy", s->size);
     sysbus_init_mmio(dev, &s->iomem);
-    return 0;
 }
 
 static Property f2xx_dummy_properties[] = {
@@ -82,15 +87,14 @@ static void
 f2xx_dummy_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(klass);
-    sc->init = f2xx_dummy_init;
     // TODO: fix this: dc->no_user = 1;
-    dc->props = f2xx_dummy_properties;
+    dc->realize = f2xx_dummy_realize;
+    device_class_set_props(dc, f2xx_dummy_properties);
 }
 
 static const TypeInfo
 f2xx_dummy_info = {
-    .name          = "f2xx_dummy",
+    .name          = TYPE_STM32F2XX_DUMMY,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(f2xx_dummy),
     .class_init    = f2xx_dummy_class_init,

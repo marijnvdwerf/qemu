@@ -19,9 +19,11 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/arm/stm32.h"
 #include "stm32f1xx.h"
 #include "exec/address-spaces.h"
+#include "hw/qdev-properties.h"
 
 /* PERIPHERALS */
 
@@ -116,7 +118,7 @@ void stm32f1xx_init(
             flash_size);
     memory_region_add_subregion(address_space_mem, 0x08000000, flash_alias_mem);
 
-    DeviceState *rcc_dev = qdev_create(NULL, "stm32f1xx_rcc");
+    DeviceState *rcc_dev = qdev_create(NULL, TYPE_STM32F1XX_RCC);
     qdev_prop_set_uint32(rcc_dev, "osc_freq", osc_freq);
     qdev_prop_set_uint32(rcc_dev, "osc32_freq", osc32_freq);
     object_property_add_child(stm32_container, "stm32f1xx_rcc", OBJECT(rcc_dev), NULL);
@@ -176,7 +178,7 @@ void stm32f1xx_init(
     };
     for (i = 0; i < ARRAY_LENGTH(uart_desc); ++i) {
         const stm32_periph_t periph = STM32F1XX_UART1 + i;
-        DeviceState *uart_dev = qdev_create(NULL, "stm32-uart");
+        DeviceState *uart_dev = qdev_create(NULL, TYPE_STM32_UART);
         uart_dev->id = stm32f1xx_periph_name_arr[periph];
         qdev_prop_set_int32(uart_dev, "periph", periph);
         qdev_prop_set_ptr(uart_dev, "stm32_rcc", rcc_dev);

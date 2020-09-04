@@ -22,10 +22,16 @@
 /*
  * QEMU stm32f2xx RTC emulation
  */
+
+#include "qemu/osdep.h"
 #include <sys/time.h>
 #include "hw/sysbus.h"
 #include "qemu/timer.h"
 #include "hw/arm/stm32.h"
+#include "hw/qdev-properties.h"
+#include "hw/irq.h"
+#include "qemu/bcd.h"
+#include "qemu/cutils.h"
 
 // Define this to add extra BKUP registers past the normal ones implemented by the STM.
 // For Pebble emulation, we use these to pass settings flags to the emulated target
@@ -613,14 +619,15 @@ static const MemoryRegionOps f2xx_rtc_ops = {
 
 static void f2xx_rtc_reset(DeviceState *dev)
 {
-    f2xx_rtc *s = FROM_SYSBUS(f2xx_rtc, SYS_BUS_DEVICE(dev));
+    f2xx_rtc *s = STM32F2XX_RTC(dev);
     s->regs[R_RTC_CR] = 0;
 }
 
-static int
-f2xx_rtc_init(SysBusDevice *dev)
+static void
+f2xx_rtc_init(Object *obj)
 {
-    f2xx_rtc *s = FROM_SYSBUS(f2xx_rtc, dev);
+    f2xx_rtc *s = STM32F2XX_RTC(obj);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &f2xx_rtc_ops, s, "rtc", 0x03ff);
     sysbus_init_mmio(dev, &s->iomem);
@@ -653,7 +660,6 @@ f2xx_rtc_init(SysBusDevice *dev)
     timer_mod(s->timer, qemu_clock_get_ns(QEMU_CLOCK_HOST) + period_ns);
 
     s->wu_timer = timer_new_ns(QEMU_CLOCK_REALTIME, f2xx_wu_timer, s);
-    return 0;
 }
 
 static Property f2xx_rtc_properties[] = {
@@ -664,18 +670,18 @@ static void
 f2xx_rtc_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(klass);
-    sc->init = f2xx_rtc_init;
+
     //TODO: fix this: dc->no_user = 1;
-    dc->props = f2xx_rtc_properties;
+    device_class_set_props(dc, f2xx_rtc_properties);
     dc->reset = f2xx_rtc_reset;
 }
 
 static const TypeInfo
 f2xx_rtc_info = {
-    .name          = "f2xx_rtc",
+    .name          = TYPE_STM32F2XX_RTC,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(f2xx_rtc),
+    .instance_init = f2xx_rtc_init,
     .class_init    = f2xx_rtc_class_init,
 };
 

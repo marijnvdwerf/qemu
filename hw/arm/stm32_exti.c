@@ -19,7 +19,11 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/arm/stm32.h"
+#include "hw/irq.h"
+#include "hw/qdev-properties.h"
+#include "hw/hw.h"
 
 
 
@@ -313,7 +317,7 @@ static const MemoryRegionOps stm32_exti_ops = {
 
 static void stm32_exti_reset(DeviceState *dev)
 {
-    Stm32Exti *s = FROM_SYSBUS(Stm32Exti, SYS_BUS_DEVICE(dev));
+    Stm32Exti *s = STM32_EXTI(dev);
 
     s->EXTI_IMR = 0x00000000;
     s->EXTI_RTSR = 0x00000000;
@@ -346,11 +350,12 @@ void stm32_exti_reset_gpio(Stm32Exti *s, unsigned exti_line, const uint8_t gpio_
 
 /* DEVICE INITIALIZATION */
 
-static int stm32_exti_init(SysBusDevice *dev)
+static void stm32_exti_realize(DeviceState *obj, Error **pError)
 {
     int i;
 
-    Stm32Exti *s = FROM_SYSBUS(Stm32Exti, dev);
+    Stm32Exti *s = STM32_EXTI(obj);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
 
     s->stm32_gpio = (stm32f2xx_gpio **)s->stm32_gpio_prop;
 
@@ -363,8 +368,6 @@ static int stm32_exti_init(SysBusDevice *dev)
     }
 
     qdev_init_gpio_in(DEVICE(dev), stm32_exti_gpio_in_handler, EXTI_LINE_COUNT);
-
-    return 0;
 }
 
 static Property stm32_exti_properties[] = {
@@ -377,13 +380,13 @@ static void stm32_exti_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32_exti_init;
+    dc->realize = stm32_exti_realize;
     dc->reset = stm32_exti_reset;
-    dc->props = stm32_exti_properties;
+    device_class_set_props(dc, stm32_exti_properties);
 }
 
 static TypeInfo stm32_exti_info = {
-    .name  = "stm32_exti",
+    .name  = TYPE_STM32_EXTI,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size  = sizeof(Stm32Exti),
     .class_init = stm32_exti_class_init

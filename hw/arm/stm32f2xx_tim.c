@@ -22,9 +22,13 @@
 /*
  * QEMU stm32f2xx TIM emulation
  */
+
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/arm/stm32.h"
 #include "qemu/timer.h"
+#include "hw/irq.h"
+#include "hw/qdev-properties.h"
 
 //#define DEBUG_STM32F2XX_TIM
 #ifdef DEBUG_STM32F2XX_TIM
@@ -273,17 +277,18 @@ static const MemoryRegionOps f2xx_tim_ops = {
 
 static void f2xx_tim_reset(DeviceState *dev)
 {
-    f2xx_tim *s = FROM_SYSBUS(f2xx_tim, SYS_BUS_DEVICE(dev));
+    f2xx_tim *s = STM32F2XX_TIM(dev);
 
     timer_del(s->timer);
     memset(&s->regs, 0, sizeof(s->regs));
 }
 
 
-static int
-f2xx_tim_init(SysBusDevice *dev)
+static void
+f2xx_tim_init(Object *obj)
 {
-    f2xx_tim *s = FROM_SYSBUS(f2xx_tim, dev);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    f2xx_tim *s = STM32F2XX_TIM(obj);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &f2xx_tim_ops, s, "tim", 0xa0);
     sysbus_init_mmio(dev, &s->iomem);
@@ -295,8 +300,6 @@ f2xx_tim_init(SysBusDevice *dev)
 
     qdev_init_gpio_out_named(DEVICE(dev), &s->pwm_ratio_changed, "pwm_ratio_changed", 1);
     qdev_init_gpio_out_named(DEVICE(dev), &s->pwm_enable, "pwm_enable", 1);
-
-    return 0;
 }
 
 static Property f2xx_tim_properties[] = {
@@ -308,17 +311,17 @@ f2xx_tim_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(klass);
-    sc->init = f2xx_tim_init;
     //TODO: fix this: dc->no_user = 1;
-    dc->props = f2xx_tim_properties;
+    device_class_set_props(dc, f2xx_tim_properties);
     dc->reset = f2xx_tim_reset;
 }
 
 static const TypeInfo
 f2xx_tim_info = {
-    .name          = "f2xx_tim",
+    .name          = TYPE_STM32F2XX_TIM,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(f2xx_tim),
+    .instance_init = f2xx_tim_init,
     .class_init    = f2xx_tim_class_init,
 };
 

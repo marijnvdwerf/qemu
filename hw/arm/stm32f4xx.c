@@ -19,13 +19,18 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
+#include "sysemu/runstate.h"
 #include "hw/arm/stm32.h"
 #include "stm32f4xx.h"
 #include "exec/address-spaces.h"
 #include "exec/memory.h"
-#include "hw/ssi.h"
+#include "hw/ssi/ssi.h"
 #include "hw/block/flash.h"
 #include "sysemu/blockdev.h" // drive_get
+#include "hw/irq.h"
+#include "hw/qdev-properties.h"
+#include "../../target/arm/cpu.h"
 
 static const char *stm32f4xx_periph_name_arr[] = {
     ENUM_STRING(STM32_UART1),
@@ -88,45 +93,43 @@ static uint64_t kernel_load_translate_fn(void *opaque, uint64_t from_addr) {
 }
 
 static
-void do_sys_reset(void *opaque, int n, int level)
-{
+void do_sys_reset(void *opaque, int n, int level) {
     if (level) {
-        qemu_system_reset_request();
+        qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
     }
 }
 
 void stm32f4xx_init(
-            ram_addr_t flash_size,        /* in KBytes */
-            ram_addr_t ram_size,          /* in KBytes */
-            const char *kernel_filename,
-            Stm32Gpio **stm32_gpio,
-            const uint32_t *gpio_idr_masks,
-            Stm32Uart **stm32_uart,
-            Stm32Timer **stm32_timer,
-            DeviceState **stm32_rtc,
-            uint32_t osc_freq,
-            uint32_t osc32_freq,
-            struct stm32f4xx *stm,
-            ARMCPU **cpu)
-{
+    ram_addr_t flash_size,        /* in KBytes */
+    ram_addr_t ram_size,          /* in KBytes */
+    const char *kernel_filename,
+    Stm32Gpio **stm32_gpio,
+    const uint32_t *gpio_idr_masks,
+    Stm32Uart **stm32_uart,
+    Stm32Timer **stm32_timer,
+    DeviceState **stm32_rtc,
+    uint32_t osc_freq,
+    uint32_t osc32_freq,
+    struct stm32f4xx *stm,
+    ARMCPU **cpu) {
     MemoryRegion *address_space_mem = get_system_memory();
     DriveInfo *dinfo;
     DeviceState *nvic;
     int i;
 
-    Object *stm32_container = container_get(qdev_get_machine(), "/stm32");
+    Object * stm32_container = container_get(qdev_get_machine(), "/stm32");
 
     nvic = armv7m_translated_init(
-                stm32_container,          /* parent */
-                address_space_mem,        /* address space memory */
-                flash_size * 1024,        /* flash size in bytes */
-                ram_size * 1024,          /* sram size in bytes */
-                0,                        /* default number of irqs */
-                kernel_filename,          /* kernel filename */
-                kernel_load_translate_fn, /* kernel translate address function */
-                NULL,                     /* translate  function opaque argument */
-                "cortex-m4",              /* cpu model */
-                cpu);                     /* Returned cpu instance */
+        stm32_container,          /* parent */
+        address_space_mem,        /* address space memory */
+        flash_size * 1024,        /* flash size in bytes */
+        ram_size * 1024,          /* sram size in bytes */
+        128,                        /* default number of irqs */
+        kernel_filename,          /* kernel filename */
+        kernel_load_translate_fn, /* kernel translate address function */
+        NULL,                     /* translate  function opaque argument */
+        ARM_CPU_TYPE_NAME("cortex-m4"),              /* cpu model */
+        cpu);                     /* Returned cpu instance */
 
     qdev_connect_gpio_out_named(nvic, "SYSRESETREQ", 0,
                                 qemu_allocate_irq(&do_sys_reset, NULL, 0));
@@ -145,50 +148,50 @@ void stm32f4xx_init(
                                                  WORD_ACCESS_SIZE);
     MemoryRegion *flash_alias = g_new(MemoryRegion, 1);
     memory_region_init_alias(
-            flash_alias,                /* alias memory region */
-            NULL,                       /* owner */
-            "stm32f4xx.flash.alias",    /* name */
-            mrs.mr,                     /* original region */
-            0,                          /* offset */
-            flash_size * 1024);         /* size in bytes */
+        flash_alias,                /* alias memory region */
+        NULL,                       /* owner */
+        "stm32f4xx.flash.alias",    /* name */
+        mrs.mr,                     /* original region */
+        0,                          /* offset */
+        flash_size * 1024);         /* size in bytes */
     memory_region_add_subregion(address_space_mem, 0, flash_alias);
 
 
     /* Setup the RCC */
-    DeviceState *rcc_dev = qdev_create(NULL, "stm32f2xx_rcc");
+    DeviceState *rcc_dev = qdev_create(NULL, TYPE_STM32F2XX_RCC);
     qdev_prop_set_uint32(rcc_dev, "osc_freq", osc_freq);
     qdev_prop_set_uint32(rcc_dev, "osc32_freq", osc32_freq);
     object_property_add_child(stm32_container, "rcc", OBJECT(rcc_dev), NULL);
     stm32_init_periph(rcc_dev,
-        STM32_RCC_PERIPH,        /* periph index, not used */
-        0x40023800,           /* base address */
-        qdev_get_gpio_in(nvic, STM32_RCC_IRQ));  /* irq */
+                      STM32_RCC_PERIPH,        /* periph index, not used */
+                      0x40023800,           /* base address */
+                      qdev_get_gpio_in(nvic, STM32_RCC_IRQ));  /* irq */
 
     /* Setup GPIOs */
-    DeviceState **gpio_dev = (DeviceState **)g_malloc0(sizeof(DeviceState *)
-                                                       * STM32F4XX_GPIO_COUNT);
-    for(i = 0; i < STM32F4XX_GPIO_COUNT; i++) {
+    DeviceState **gpio_dev = (DeviceState **) g_malloc0(sizeof(DeviceState *)
+                                                            * STM32F4XX_GPIO_COUNT);
+    for (i = 0; i < STM32F4XX_GPIO_COUNT; i++) {
         stm32_periph_t periph = STM32_GPIOA + i;
-        gpio_dev[i] = qdev_create(NULL, "stm32f2xx_gpio");
+        gpio_dev[i] = qdev_create(NULL, TYPE_STM32F2XX_GPIO);
         gpio_dev[i]->id = stm32f4xx_periph_name_arr[periph];
         qdev_prop_set_int32(gpio_dev[i], "periph", periph);
         qdev_prop_set_uint32(gpio_dev[i], "idr-mask", gpio_idr_masks[i]);
         // qdev_prop_set_ptr(gpio_dev[i], "stm32_rcc", rcc_dev);
         stm32_init_periph(gpio_dev[i], periph, 0x40020000 + (i * 0x400), NULL /*irq*/);
-        stm32_gpio[i] = (Stm32Gpio *)gpio_dev[i];
+        stm32_gpio[i] = (Stm32Gpio *) gpio_dev[i];
     }
 
     /* Connect the WKUP pin (GPIO A, pin 0) to the NVIC's WKUP handler */
-    qemu_irq nvic_wake_irq = qdev_get_gpio_in_named(DEVICE((*cpu)->env.nvic), "wakeup_in", 0);
-    f2xx_gpio_wake_set((stm32f2xx_gpio *)(stm32_gpio[STM32_GPIOA_INDEX]), 0, nvic_wake_irq);
+//NVIC     qemu_irq nvic_wake_irq = qdev_get_gpio_in_named(DEVICE((*cpu)->env.nvic), "wakeup_in", 0);
+//NVIC     f2xx_gpio_wake_set((stm32f2xx_gpio *) (stm32_gpio[STM32_GPIOA_INDEX]), 0, nvic_wake_irq);
 
 
     /* EXTI */
-    DeviceState *exti_dev = qdev_create(NULL, "stm32_exti");
+    DeviceState *exti_dev = qdev_create(NULL, TYPE_STM32_EXTI);
     qdev_prop_set_ptr(exti_dev, "stm32_gpio", gpio_dev);
     stm32_init_periph(exti_dev, STM32_EXTI_PERIPH, 0x40013C00, NULL);
     SysBusDevice *exti_busdev = SYS_BUS_DEVICE(exti_dev);
-    
+
     /* IRQs from EXTI to NVIC */
     sysbus_connect_irq(exti_busdev, 0, qdev_get_gpio_in(nvic, STM32_EXTI0_IRQ));
     sysbus_connect_irq(exti_busdev, 1, qdev_get_gpio_in(nvic, STM32_EXTI1_IRQ));
@@ -207,7 +210,7 @@ void stm32f4xx_init(
 
 
     /* System configuration controller */
-    DeviceState *syscfg_dev = qdev_create(NULL, "stm32f2xx_syscfg");
+    DeviceState *syscfg_dev = qdev_create(NULL, TYPE_STM32F2XX_SYSCFG);
     qdev_prop_set_ptr(syscfg_dev, "stm32_rcc", rcc_dev);
     qdev_prop_set_ptr(syscfg_dev, "stm32_exti", exti_dev);
     qdev_prop_set_bit(syscfg_dev, "boot0", 0);
@@ -231,7 +234,7 @@ void stm32f4xx_init(
     for (i = 0; i < ARRAY_LENGTH(uart_desc); ++i) {
         assert(i < STM32F4XX_UART_COUNT);
         const stm32_periph_t periph = STM32_UART1 + i;
-        DeviceState *uart_dev = qdev_create(NULL, "stm32-uart");
+        DeviceState *uart_dev = qdev_create(NULL, TYPE_STM32_UART);
         uart_dev->id = stm32f4xx_periph_name_arr[periph];
         qdev_prop_set_int32(uart_dev, "periph", periph);
         qdev_prop_set_ptr(uart_dev, "stm32_rcc", rcc_dev);
@@ -244,7 +247,7 @@ void stm32f4xx_init(
             irq = qdev_get_gpio_in(nvic, uart_desc[i].irq_idx);
         }
         stm32_init_periph(uart_dev, periph, uart_desc[i].addr, irq);
-        stm32_uart[i] = (Stm32Uart *)uart_dev;
+        stm32_uart[i] = (Stm32Uart *) uart_dev;
     }
     // TODO: Should we use these instead?
 //    stm32_uart[STM32_UART1_INDEX] = stm32_create_uart_dev(STM32_UART1, rcc_dev, gpio_dev, afio_dev, 0x40011000, pic[STM32_UART1_IRQ]);
@@ -270,7 +273,7 @@ void stm32f4xx_init(
     for (i = 0; i < ARRAY_LENGTH(spi_desc); ++i) {
         assert(i < STM32F4XX_SPI_COUNT);
         const stm32_periph_t periph = STM32_SPI1 + i;
-        stm->spi_dev[i] = qdev_create(NULL, "stm32f2xx_spi");
+        stm->spi_dev[i] = qdev_create(NULL, TYPE_STM32F2XX_SPI);
         stm->spi_dev[i]->id = stm32f4xx_periph_name_arr[periph];
         qdev_prop_set_int32(stm->spi_dev[i], "periph", periph);
         stm32_init_periph(stm->spi_dev[i], periph, spi_desc[i].addr,
@@ -278,16 +281,16 @@ void stm32f4xx_init(
     }
 
     /* QSPI */
-    stm->qspi_dev = qdev_create(NULL, "stm32f412_qspi");
+    stm->qspi_dev = qdev_create(NULL, TYPE_STM32F412_QSPI);
     stm->qspi_dev->id = stm32f4xx_periph_name_arr[STM32_QSPI];
     stm32_init_periph(stm->qspi_dev, STM32_QSPI, 0xA0001000, qdev_get_gpio_in(nvic, STM32_QSPI_IRQ));
 
     /* ADC */
-    DeviceState *adc_dev = qdev_create(NULL, "stm32f2xx_adc");
+    DeviceState *adc_dev = qdev_create(NULL, TYPE_STM32_ADC);
     stm32_init_periph(adc_dev, STM32_ADC1, 0x40012000, NULL);
 
     /* RTC real time clock */
-    DeviceState *rtc_dev = qdev_create(NULL, "f2xx_rtc");
+    DeviceState *rtc_dev = qdev_create(NULL, TYPE_STM32F2XX_RTC);
     *stm32_rtc = rtc_dev;
     stm32_init_periph(rtc_dev, STM32_RTC, 0x40002800, NULL);
     // Alarm A
@@ -298,12 +301,12 @@ void stm32f4xx_init(
     sysbus_connect_irq(SYS_BUS_DEVICE(rtc_dev), 2, qdev_get_gpio_in(exti_dev, 22));
 
     /* Power management */
-    DeviceState *pwr_dev = qdev_create(NULL, "f2xx_pwr");
+    DeviceState *pwr_dev = qdev_create(NULL, TYPE_STM32F2XX_PWR);
     stm32_init_periph(pwr_dev, STM32_RTC, 0x40007000, NULL);
-    qdev_prop_set_ptr((*cpu)->env.nvic, "stm32_pwr", pwr_dev);
+//NVIC    qdev_prop_set_ptr((*cpu)->env.nvic, "stm32_pwr", pwr_dev);
 
 #define dummy_dev(name, start, size) do {\
-    DeviceState *dummy = qdev_create(NULL, "f2xx_dummy"); \
+    DeviceState *dummy = qdev_create(NULL, TYPE_STM32F2XX_DUMMY); \
     qdev_prop_set_ptr(dummy, "name", (void *)name); \
     qdev_prop_set_int32(dummy, "size", size); \
     qdev_init_nofail(dummy); \
@@ -336,27 +339,27 @@ void stm32f4xx_init(
         assert(i < STM32F4XX_TIM_COUNT);
         const stm32_periph_t periph = STM32_TIM1 + timer_desc[i].timer_num - 1;
 
-        DeviceState *timer = qdev_create(NULL, "f2xx_tim");
+        DeviceState *timer = qdev_create(NULL, TYPE_STM32F2XX_TIM);
         timer->id = stm32f4xx_periph_name_arr[periph];
         stm32_init_periph(timer, periph, timer_desc[i].addr,
                           qdev_get_gpio_in(nvic, timer_desc[i].irq_idx));
-        stm32_timer[timer_desc[i].timer_num - 1] = (Stm32Timer *)timer;
+        stm32_timer[timer_desc[i].timer_num - 1] = (Stm32Timer *) timer;
     }
 
-    dummy_dev("Reserved",  0x40002400, 0x400);
+    dummy_dev("Reserved", 0x40002400, 0x400);
     // 0x40002800
-    dummy_dev("WWDG",      0x40002C00, 0x400);
-    dummy_dev("IWDG",      0x40003000, 0x400);
-    dummy_dev("Reserved",  0x40003400, 0x400);
+    dummy_dev("WWDG", 0x40002C00, 0x400);
+    dummy_dev("IWDG", 0x40003000, 0x400);
+    dummy_dev("Reserved", 0x40003400, 0x400);
     // 0x40003800
     // 0x40003C00
-    dummy_dev("Reserved",  0x40004000, 0x400);
+    dummy_dev("Reserved", 0x40004000, 0x400);
     // 0x40004400
     // 0x40004800
     // 0x40004C00
     // 0x40005000
 
-    DeviceState *i2c1 = qdev_create(NULL, "f2xx_i2c");
+    DeviceState *i2c1 = qdev_create(NULL, TYPE_STM32F2XX_I2C);
     i2c1->id = stm32f4xx_periph_name_arr[STM32_I2C1];
     qdev_prop_set_int32(i2c1, "periph", STM32_I2C1);
     stm32_init_periph(i2c1, STM32_I2C1, 0x40005400,
@@ -364,7 +367,7 @@ void stm32f4xx_init(
     sysbus_connect_irq(SYS_BUS_DEVICE(i2c1), 1,
                        qdev_get_gpio_in(nvic, STM32_I2C1_ER_IRQ));
 
-    DeviceState *i2c2 = qdev_create(NULL, "f2xx_i2c");
+    DeviceState *i2c2 = qdev_create(NULL, TYPE_STM32F2XX_I2C);
     i2c2->id = stm32f4xx_periph_name_arr[STM32_I2C2];
     qdev_prop_set_int32(i2c2, "periph", STM32_I2C2);
     stm32_init_periph(i2c2, STM32_I2C2, 0x40005800,
@@ -372,7 +375,7 @@ void stm32f4xx_init(
     sysbus_connect_irq(SYS_BUS_DEVICE(i2c2), 1,
                        qdev_get_gpio_in(nvic, STM32_I2C2_ER_IRQ));
 
-    DeviceState *i2c3 = qdev_create(NULL, "f2xx_i2c");
+    DeviceState *i2c3 = qdev_create(NULL, TYPE_STM32F2XX_I2C);
     i2c3->id = stm32f4xx_periph_name_arr[STM32_I2C3];
     qdev_prop_set_int32(i2c3, "periph", STM32_I2C3);
     stm32_init_periph(i2c3, STM32_I2C2, 0x40005C00,
@@ -380,27 +383,27 @@ void stm32f4xx_init(
     sysbus_connect_irq(SYS_BUS_DEVICE(i2c3), 1,
                        qdev_get_gpio_in(nvic, STM32_I2C3_ER_IRQ));
 
-    dummy_dev("Reserved",  0x40006000, 0x400);
-    dummy_dev("BxCAN1",    0x40006400, 0x400);
-    dummy_dev("BxCAN2",    0x40006800, 0x400);
-    dummy_dev("Reserved",  0x40006C00, 0x400);
+    dummy_dev("Reserved", 0x40006000, 0x400);
+    dummy_dev("BxCAN1", 0x40006400, 0x400);
+    dummy_dev("BxCAN2", 0x40006800, 0x400);
+    dummy_dev("Reserved", 0x40006C00, 0x400);
     //  0x40007000 PWR probably common
     dummy_dev("DAC1/DAC2", 0x40007400, 0x400);
-    dummy_dev("Reserved",  0x40007800, 0x400);
-    dummy_dev("Reserved",  0x40008000, 0x8000);
+    dummy_dev("Reserved", 0x40007800, 0x400);
+    dummy_dev("Reserved", 0x40008000, 0x8000);
     // USART1
     // USART6
-    dummy_dev("Reserved",  0x40011800, 0x800);
+    dummy_dev("Reserved", 0x40011800, 0x800);
     // ADC1 - ADC2 - ADC3
     // skipped reserved from here on
-    dummy_dev("SDIO",      0x40012C00, 0x400);
+    dummy_dev("SDIO", 0x40012C00, 0x400);
     // SPI1
     // SYSCFG needed
 
-    DeviceState *crc = qdev_create(NULL, "f2xx_crc");
+    DeviceState *crc = qdev_create(NULL, TYPE_STM32F2XX_CRC);
     stm32_init_periph(crc, STM32_CRC, 0x40023000, NULL);
-    
-    DeviceState *dma1 = qdev_create(NULL, "f2xx_dma");
+
+    DeviceState *dma1 = qdev_create(NULL, TYPE_STM32F2XX_DMA);
     stm32_init_periph(dma1, STM32_DMA1, 0x40026000, NULL);
     sysbus_connect_irq(SYS_BUS_DEVICE(dma1), 0, qdev_get_gpio_in(nvic, STM32_DMA1_STREAM0_IRQ));
     sysbus_connect_irq(SYS_BUS_DEVICE(dma1), 1, qdev_get_gpio_in(nvic, STM32_DMA1_STREAM1_IRQ));
@@ -411,7 +414,7 @@ void stm32f4xx_init(
     sysbus_connect_irq(SYS_BUS_DEVICE(dma1), 6, qdev_get_gpio_in(nvic, STM32_DMA1_STREAM6_IRQ));
     sysbus_connect_irq(SYS_BUS_DEVICE(dma1), 7, qdev_get_gpio_in(nvic, STM32_DMA1_STREAM7_IRQ));
 
-    DeviceState *dma2 = qdev_create(NULL, "f2xx_dma");
+    DeviceState *dma2 = qdev_create(NULL, TYPE_STM32F2XX_DMA);
     stm32_init_periph(dma2, STM32_DMA2, 0x40026400, NULL);
     sysbus_connect_irq(SYS_BUS_DEVICE(dma2), 0, qdev_get_gpio_in(nvic, STM32_DMA2_STREAM0_IRQ));
     sysbus_connect_irq(SYS_BUS_DEVICE(dma2), 1, qdev_get_gpio_in(nvic, STM32_DMA2_STREAM1_IRQ));

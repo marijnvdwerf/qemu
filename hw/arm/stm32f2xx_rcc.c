@@ -20,8 +20,13 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "stm32f2xx_rcc.h"
 #include "qemu/timer.h"
+#include "hw/hw.h"
+#include "hw/qdev-properties.h"
+#include "hw/irq.h"
+#include "hw/timer/armv7m_systick.h"
 #include <stdio.h>
 
 
@@ -922,7 +927,7 @@ static const MemoryRegionOps stm32_rcc_ops = {
 
 static void stm32_rcc_reset(DeviceState *dev)
 {
-    Stm32f2xxRcc *s = FROM_SYSBUS(Stm32f2xxRcc, SYS_BUS_DEVICE(dev));
+    Stm32f2xxRcc *s = STM32F2XX_RCC(dev);
 
     stm32_rcc_RCC_CR_write(s, RCC_CR_RESET_VALUE, true);
     stm32_rcc_RCC_PLLCFGR_write(s, RCC_PLLCFGR_RESET_VALUE, true);
@@ -952,7 +957,7 @@ static void stm32_rcc_hclk_upd_irq_handler(void *opaque, int n, int level)
          * (which is an unchanging number independent of the CPU frequency) to
          * system/external clock ticks.
          */
-        system_clock_scale = get_ticks_per_sec() / hclk_freq;
+        system_clock_scale = NANOSECONDS_PER_SECOND / hclk_freq;
     }
 
 #ifdef DEBUG_STM32_RCC
@@ -1085,9 +1090,10 @@ static void stm32_rcc_init_clk(Stm32f2xxRcc *s)
 
 
 
-static int stm32_rcc_init(SysBusDevice *dev)
+static void stm32_rcc_realize(DeviceState *obj, Error **pError)
 {
-    Stm32f2xxRcc *s = FROM_SYSBUS(Stm32f2xxRcc, dev);
+    Stm32f2xxRcc *s = STM32F2XX_RCC(obj);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &stm32_rcc_ops, s,
                           "rcc", 0x40023BFF - 0x40023800 + 1);
@@ -1097,8 +1103,6 @@ static int stm32_rcc_init(SysBusDevice *dev)
     sysbus_init_irq(dev, &s->irq);
 
     stm32_rcc_init_clk(s);
-
-    return 0;
 }
 
 
@@ -1114,13 +1118,13 @@ static void stm32_rcc_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32_rcc_init;
+    dc->realize = stm32_rcc_realize,
     dc->reset = stm32_rcc_reset;
-    dc->props = stm32_rcc_properties;
+    device_class_set_props(dc, stm32_rcc_properties);
 }
 
 static TypeInfo stm32_rcc_info = {
-    .name  = "stm32f2xx_rcc",
+    .name  = TYPE_STM32F2XX_RCC,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size  = sizeof(Stm32f2xxRcc),
     .class_init = stm32_rcc_class_init

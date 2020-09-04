@@ -32,12 +32,7 @@
 /* #define DEBUG_GIC */
 
 #ifdef DEBUG_GIC
-<<<<<<< HEAD
 #define DEBUG_GIC_GATE 1
-=======
-#define DPRINTF(fmt, ...) \
-do { printf("DEBUG_GIC: " fmt , ## __VA_ARGS__); usleep(100);} while (0)
->>>>>>> 919b29ba7d... Pebble Qemu
 #else
 #define DEBUG_GIC_GATE 0
 #endif
@@ -464,7 +459,6 @@ static int gic_get_group_priority(GICState *s, int cpu, int irq)
         assert(bpr >= 0);
     } else {
         bpr = s->bpr[cpu];
-        return GIC_GET_PRIORITY(irq, cpu);
     }
 
     /* a BPR of 0 means the group priority bits are [7:1];

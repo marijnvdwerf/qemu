@@ -22,9 +22,13 @@
 /*
  * QEMU stm32f7xx LPTIM emulation
  */
+
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/arm/stm32.h"
 #include "qemu/timer.h"
+#include "hw/qdev-properties.h"
+#include "hw/irq.h"
 
 //#define DEBUG_STM32F7XX_LPTIM
 #ifdef DEBUG_STM32F7XX_LPTIM
@@ -193,15 +197,16 @@ static const MemoryRegionOps f7xx_lptim_ops = {
 };
 
 static void f7xx_lptim_reset(DeviceState *dev) {
-    f7xx_lptim *s = FROM_SYSBUS(f7xx_lptim, SYS_BUS_DEVICE(dev));
+    f7xx_lptim *s = STM32F7XX_LPTIM(dev);
 
     timer_del(s->timer);
     memset(&s->regs, 0, sizeof(s->regs));
 }
 
 
-static int f7xx_lptim_init(SysBusDevice *dev) {
-    f7xx_lptim *s = FROM_SYSBUS(f7xx_lptim, dev);
+static void f7xx_lptim_init(Object *obj) {
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    f7xx_lptim *s = STM32F7XX_LPTIM(obj);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &f7xx_lptim_ops, s, "lptim", 0xa0);
     sysbus_init_mmio(dev, &s->iomem);
@@ -210,8 +215,6 @@ static int f7xx_lptim_init(SysBusDevice *dev) {
 
     qdev_init_gpio_out_named(DEVICE(dev), &s->pwm_ratio_changed, "pwm_ratio_changed", 1);
     qdev_init_gpio_out_named(DEVICE(dev), &s->pwm_enable, "pwm_enable", 1);
-
-    return 0;
 }
 
 static Property f7xx_lptim_properties[] = {
@@ -221,16 +224,17 @@ static Property f7xx_lptim_properties[] = {
 static void f7xx_lptim_class_init(ObjectClass *klass, void *data) {
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(klass);
-    sc->init = f7xx_lptim_init;
     //TODO: fix this: dc->no_user = 1;
-    dc->props = f7xx_lptim_properties;
     dc->reset = f7xx_lptim_reset;
+
+    device_class_set_props(dc, f7xx_lptim_properties);
 }
 
 static const TypeInfo f7xx_lptim_info = {
-    .name          = "f7xx_lptim",
+    .name          = TYPE_STM32F7XX_LPTIM,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(f7xx_lptim),
+    .instance_init = f7xx_lptim_init,
     .class_init    = f7xx_lptim_class_init,
 };
 

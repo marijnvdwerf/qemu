@@ -19,9 +19,11 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/arm/stm32.h"
 #include "exec/address-spaces.h"
 #include "exec/gdbstub.h"
+#include "hw/qdev-properties.h"
 
 /* DEFINITIONS */
 
@@ -35,7 +37,7 @@ void stm32_hw_warn(const char *fmt, ...)
     fprintf(stderr, "qemu stm32: hardware warning: ");
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
-    cpu_dump_state(first_cpu, stderr, fprintf, 0);
+    cpu_dump_state(first_cpu, stderr, 0);
     va_end(ap);
 }
 
@@ -51,7 +53,7 @@ void stm32_create_uart_dev(
         qemu_irq irq)
 {
     char child_name[8];
-    DeviceState *uart_dev = qdev_create(NULL, "stm32-uart");
+    DeviceState *uart_dev = qdev_create(NULL, TYPE_STM32_UART);
     QDEV_PROP_SET_PERIPH_T(uart_dev, "periph", periph);
     qdev_prop_set_ptr(uart_dev, "stm32_rcc", rcc_dev);
     qdev_prop_set_ptr(uart_dev, "stm32_gpio", gpio_dev);

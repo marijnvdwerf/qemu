@@ -36,6 +36,7 @@
  * It does not implement much more ...
  */
 
+#include "qemu/osdep.h"
 #include "hw/hw.h"
 #include "hw/block/flash.h"
 #include "block/block.h"
@@ -45,6 +46,9 @@
 #include "exec/address-spaces.h"
 #include "qemu/host-utils.h"
 #include "hw/sysbus.h"
+#include "hw/qdev-properties.h"
+#include "qapi/error.h"
+#include "migration/vmstate.h"
 
 #define PFLASH_BUG(fmt, ...) \
 do { \
@@ -64,12 +68,9 @@ do {                                                        \
 #define DPRINTF(fmt, ...) do { } while (0)
 #endif
 
-#define TYPE_CFI_PFLASH_JEDEC_424 "cfi.pflash.jedec-42.4"
-#define CFI_PFLASH_JEDEC(obj) OBJECT_CHECK(pflash_t, (obj), TYPE_CFI_PFLASH_JEDEC_424)
-
 #define PFLASH_MAX_BANKS 8
 
-struct pflash_t {
+struct PFlashJedec424 {
     /*< private >*/
     SysBusDevice parent_obj;
     /*< public >*/
@@ -106,16 +107,16 @@ static const VMStateDescription vmstate_pflash = {
     .version_id = 2,
     .minimum_version_id = 2,
     .fields = (VMStateField[]) {
-        VMSTATE_UINT8_ARRAY(wcycle, pflash_t, PFLASH_MAX_BANKS),
-        VMSTATE_UINT8_ARRAY(cmd, pflash_t, PFLASH_MAX_BANKS),
-        VMSTATE_UINT8(global_cmd, pflash_t),
-        VMSTATE_UINT8(status, pflash_t),
-        VMSTATE_UINT64(counter, pflash_t),
+        VMSTATE_UINT8_ARRAY(wcycle, PFlashJedec424, PFLASH_MAX_BANKS),
+        VMSTATE_UINT8_ARRAY(cmd, PFlashJedec424, PFLASH_MAX_BANKS),
+        VMSTATE_UINT8(global_cmd, PFlashJedec424),
+        VMSTATE_UINT8(status, PFlashJedec424),
+        VMSTATE_UINT64(counter, PFlashJedec424),
         VMSTATE_END_OF_LIST()
     }
 };
 
-static void pflash_reset_state(struct pflash_t* pfl)
+static void pflash_reset_state(PFlashJedec424* pfl)
 {
     memset(pfl->wcycle, 0, sizeof(pfl->wcycle));
     memset(pfl->cmd, 0, sizeof(pfl->cmd));
@@ -126,7 +127,7 @@ static void pflash_reset_state(struct pflash_t* pfl)
  * If this code is called we know we have a device_width set for
  * this flash.
  */
-static uint32_t pflash_cfi_query(pflash_t *pfl, hwaddr offset)
+static uint32_t pflash_cfi_query(PFlashJedec424 *pfl, hwaddr offset)
 {
     int i;
     uint32_t resp = 0;
@@ -186,7 +187,7 @@ static uint32_t pflash_cfi_query(pflash_t *pfl, hwaddr offset)
 
 
 /* Perform a device id query based on the bank width of the flash. */
-static uint32_t pflash_devid_query(pflash_t *pfl, hwaddr offset)
+static uint32_t pflash_devid_query(PFlashJedec424 *pfl, hwaddr offset)
 {
     int i;
     uint32_t resp;
@@ -235,13 +236,14 @@ static uint32_t pflash_devid_query(pflash_t *pfl, hwaddr offset)
     return resp;
 }
 
-static uint32_t pflash_read (pflash_t *pfl, hwaddr offset,
-                             int width, int be)
+static uint64_t pflash_read (void *opaque, hwaddr offset,
+                             unsigned int width)
 {
     hwaddr boff;
     uint32_t ret;
     uint8_t *p;
 
+    PFlashJedec424 *pfl = CFI_PFLASH_JEDEC(opaque);
     ret = -1;
 
     uint8_t bank = offset / pfl->bank_size;
@@ -267,28 +269,28 @@ static uint32_t pflash_read (pflash_t *pfl, hwaddr offset,
             //        __func__, offset, ret);
             break;
         case 2:
-            if (be) {
-                ret = p[offset] << 8;
-                ret |= p[offset + 1];
-            } else {
+//            if (be) {
+//                ret = p[offset] << 8;
+//                ret |= p[offset + 1];
+//            } else {
                 ret = p[offset];
                 ret |= p[offset + 1] << 8;
-            }
+//            }
             //DPRINTF("%s: data offset " TARGET_FMT_plx " %04x\n",
             //        __func__, offset, ret);
             break;
         case 4:
-            if (be) {
+//            if (be) {
                 ret = p[offset] << 24;
                 ret |= p[offset + 1] << 16;
                 ret |= p[offset + 2] << 8;
                 ret |= p[offset + 3];
-            } else {
-                ret = p[offset];
-                ret |= p[offset + 1] << 8;
-                ret |= p[offset + 2] << 16;
-                ret |= p[offset + 3] << 24;
-            }
+//            } else {
+//                ret = p[offset];
+//                ret |= p[offset + 1] << 8;
+//                ret |= p[offset + 2] << 16;
+//                ret |= p[offset + 3] << 24;
+//            }
             //DPRINTF("%s: data offset " TARGET_FMT_plx " %08x\n",
             //        __func__, offset, ret);
             break;
@@ -393,21 +395,18 @@ static uint32_t pflash_read (pflash_t *pfl, hwaddr offset,
 }
 
 /* update flash content on disk */
-static void pflash_update(pflash_t *pfl, int offset,
+static void pflash_update(PFlashJedec424 *pfl, int offset,
                           int size)
 {
     int offset_end;
     if (pfl->blk) {
         offset_end = offset + size;
-        /* round to sectors */
-        offset = offset >> 9;
-        offset_end = (offset_end + 511) >> 9;
-        blk_write(pfl->blk, offset, pfl->storage + (offset << 9),
-                   offset_end - offset);
+        blk_pwrite(pfl->blk, offset, pfl->storage + offset,
+                   offset_end - offset, 0);
     }
 }
 
-static inline void pflash_data_write(pflash_t *pfl, hwaddr offset,
+static inline void pflash_data_write(PFlashJedec424 *pfl, hwaddr offset,
                                      uint32_t value, int width, int be)
 {
     uint8_t *p = pfl->storage;
@@ -449,13 +448,14 @@ static inline void pflash_data_write(pflash_t *pfl, hwaddr offset,
 
 }
 
-static void pflash_write(pflash_t *pfl, hwaddr offset,
-                         uint32_t value, int width, int be)
+static void pflash_write(void *opaque, hwaddr offset,
+                         uint64_t value, unsigned int width)
 {
     uint8_t cmd;
     int i;
     uint8_t *p;
 
+    PFlashJedec424 *pfl = CFI_PFLASH_JEDEC(opaque);
     cmd = value;
 
     uint8_t bank = pfl->global_cmd ? 0 : offset / pfl->bank_size;
@@ -628,7 +628,7 @@ static void pflash_write(pflash_t *pfl, hwaddr offset,
             if (!pfl->ro) {
                 DPRINTF("%s: Programming %d bytes at " TARGET_FMT_plx " to 0x%x\n", __func__,
                             width, offset, value);
-                pflash_data_write(pfl, offset, value, width, be);
+                pflash_data_write(pfl, offset, value, width, 0);
             } else {
                 pfl->status |= 0x10; /* Programming error */
             }
@@ -730,107 +730,17 @@ static void pflash_write(pflash_t *pfl, hwaddr offset,
 }
 
 
-static uint32_t pflash_readb_be(void *opaque, hwaddr addr)
-{
-    return pflash_read(opaque, addr, 1, 1);
-}
-
-static uint32_t pflash_readb_le(void *opaque, hwaddr addr)
-{
-    return pflash_read(opaque, addr, 1, 0);
-}
-
-static uint32_t pflash_readw_be(void *opaque, hwaddr addr)
-{
-    pflash_t *pfl = opaque;
-
-    return pflash_read(pfl, addr, 2, 1);
-}
-
-static uint32_t pflash_readw_le(void *opaque, hwaddr addr)
-{
-    pflash_t *pfl = opaque;
-
-    return pflash_read(pfl, addr, 2, 0);
-}
-
-static uint32_t pflash_readl_be(void *opaque, hwaddr addr)
-{
-    pflash_t *pfl = opaque;
-
-    return pflash_read(pfl, addr, 4, 1);
-}
-
-static uint32_t pflash_readl_le(void *opaque, hwaddr addr)
-{
-    pflash_t *pfl = opaque;
-
-    return pflash_read(pfl, addr, 4, 0);
-}
-
-static void pflash_writeb_be(void *opaque, hwaddr addr,
-                             uint32_t value)
-{
-    pflash_write(opaque, addr, value, 1, 1);
-}
-
-static void pflash_writeb_le(void *opaque, hwaddr addr,
-                             uint32_t value)
-{
-    pflash_write(opaque, addr, value, 1, 0);
-}
-
-static void pflash_writew_be(void *opaque, hwaddr addr,
-                             uint32_t value)
-{
-    pflash_t *pfl = opaque;
-
-    pflash_write(pfl, addr, value, 2, 1);
-}
-
-static void pflash_writew_le(void *opaque, hwaddr addr,
-                             uint32_t value)
-{
-    pflash_t *pfl = opaque;
-
-    pflash_write(pfl, addr, value, 2, 0);
-}
-
-static void pflash_writel_be(void *opaque, hwaddr addr,
-                             uint32_t value)
-{
-    pflash_t *pfl = opaque;
-
-    pflash_write(pfl, addr, value, 4, 1);
-}
-
-static void pflash_writel_le(void *opaque, hwaddr addr,
-                             uint32_t value)
-{
-    pflash_t *pfl = opaque;
-
-    pflash_write(pfl, addr, value, 4, 0);
-}
-
-static const MemoryRegionOps pflash_jedec_ops_be = {
-    .old_mmio = {
-        .read = { pflash_readb_be, pflash_readw_be, pflash_readl_be, },
-        .write = { pflash_writeb_be, pflash_writew_be, pflash_writel_be, },
-    },
-    .endianness = DEVICE_NATIVE_ENDIAN,
-};
-
-static const MemoryRegionOps pflash_jedec_ops_le = {
-    .old_mmio = {
-        .read = { pflash_readb_le, pflash_readw_le, pflash_readl_le, },
-        .write = { pflash_writeb_le, pflash_writew_le, pflash_writel_le, },
-    },
+static const MemoryRegionOps pflash_jedec_ops = {
+    .read = pflash_read,
+    .write = pflash_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
     .endianness = DEVICE_NATIVE_ENDIAN,
 };
 
 static void pflash_jedec_realize(DeviceState *dev, Error **errp)
 {
-    pflash_t *pfl = CFI_PFLASH_JEDEC(dev);
+    PFlashJedec424 *pfl = CFI_PFLASH_JEDEC(dev);
     uint64_t total_len;
     int ret;
     uint64_t blocks_per_device, device_len;
@@ -847,7 +757,7 @@ static void pflash_jedec_realize(DeviceState *dev, Error **errp)
 
     memory_region_init_rom_device(
         &pfl->mem, OBJECT(dev),
-        pfl->be ? &pflash_jedec_ops_be : &pflash_jedec_ops_le, pfl,
+        &pflash_jedec_ops, pfl,
         pfl->name, total_len, errp);
     vmstate_register_ram(&pfl->mem, DEVICE(pfl));
     pfl->storage = memory_region_get_ram_ptr(&pfl->mem);
@@ -855,7 +765,7 @@ static void pflash_jedec_realize(DeviceState *dev, Error **errp)
 
     if (pfl->blk) {
         /* read the initial flash content */
-        ret = blk_read(pfl->blk, 0, pfl->storage, total_len >> 9);
+        ret = blk_pread(pfl->blk, 0, pfl->storage, total_len);
 
         if (ret < 0) {
             vmstate_unregister_ram(&pfl->mem, DEVICE(pfl));
@@ -976,14 +886,14 @@ static void pflash_jedec_realize(DeviceState *dev, Error **errp)
 }
 
 static Property pflash_jedec_properties[] = {
-    DEFINE_PROP_DRIVE("drive", struct pflash_t, blk),
+    DEFINE_PROP_DRIVE("drive", PFlashJedec424, blk),
     /* num-blocks is the number of blocks actually visible to the guest,
      * ie the total size of the device divided by the sector length.
      * If we're emulating flash devices wired in parallel the actual
      * number of blocks per indvidual device will differ.
      */
-    DEFINE_PROP_UINT32("num-blocks", struct pflash_t, nb_blocs, 0),
-    DEFINE_PROP_UINT64("sector-length", struct pflash_t, sector_len, 0),
+    DEFINE_PROP_UINT32("num-blocks", PFlashJedec424, nb_blocs, 0),
+    DEFINE_PROP_UINT64("sector-length", PFlashJedec424, sector_len, 0),
     /* width here is the overall width of this QEMU device in bytes.
      * The QEMU device may be emulating a number of flash devices
      * wired up in parallel; the width of each individual flash
@@ -1000,16 +910,16 @@ static Property pflash_jedec_properties[] = {
      * 16 bit devices making up a 32 bit wide QEMU device. This
      * is deprecated for new uses of this device.
      */
-    DEFINE_PROP_UINT8("width", struct pflash_t, bank_width, 0),
-    DEFINE_PROP_UINT8("device-width", struct pflash_t, device_width, 0),
-    DEFINE_PROP_UINT8("max-device-width", struct pflash_t, max_device_width, 0),
-    DEFINE_PROP_UINT32("bank-size", struct pflash_t, bank_size, 0),
-    DEFINE_PROP_UINT8("big-endian", struct pflash_t, be, 0),
-    DEFINE_PROP_UINT16("id0", struct pflash_t, ident0, 0),
-    DEFINE_PROP_UINT16("id1", struct pflash_t, ident1, 0),
-    DEFINE_PROP_UINT16("id2", struct pflash_t, ident2, 0),
-    DEFINE_PROP_UINT16("id3", struct pflash_t, ident3, 0),
-    DEFINE_PROP_STRING("name", struct pflash_t, name),
+    DEFINE_PROP_UINT8("width", PFlashJedec424, bank_width, 0),
+    DEFINE_PROP_UINT8("device-width", PFlashJedec424, device_width, 0),
+    DEFINE_PROP_UINT8("max-device-width", PFlashJedec424, max_device_width, 0),
+    DEFINE_PROP_UINT32("bank-size", PFlashJedec424, bank_size, 0),
+    DEFINE_PROP_UINT8("big-endian", PFlashJedec424, be, 0),
+    DEFINE_PROP_UINT16("id0", PFlashJedec424, ident0, 0),
+    DEFINE_PROP_UINT16("id1", PFlashJedec424, ident1, 0),
+    DEFINE_PROP_UINT16("id2", PFlashJedec424, ident2, 0),
+    DEFINE_PROP_UINT16("id3", PFlashJedec424, ident3, 0),
+    DEFINE_PROP_STRING("name", PFlashJedec424, name),
     DEFINE_PROP_END_OF_LIST(),
 };
 
@@ -1017,17 +927,17 @@ static void pflash_jedec_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
-    dc->realize = pflash_jedec_realize;
-    dc->props = pflash_jedec_properties;
+    dc->realize = pflash_jedec_realize;;
     dc->vmsd = &vmstate_pflash;
     set_bit(DEVICE_CATEGORY_STORAGE, dc->categories);
+    device_class_set_props(dc, pflash_jedec_properties);
 }
 
 
 static const TypeInfo pflash_jedec_info = {
     .name           = TYPE_CFI_PFLASH_JEDEC_424,
     .parent         = TYPE_SYS_BUS_DEVICE,
-    .instance_size  = sizeof(struct pflash_t),
+    .instance_size  = sizeof(PFlashJedec424),
     .class_init     = pflash_jedec_class_init,
 };
 
@@ -1038,7 +948,7 @@ static void pflash_jedec_register_types(void)
 
 type_init(pflash_jedec_register_types)
 
-pflash_t *pflash_jedec_424_register(hwaddr base,
+PFlashJedec424 *pflash_jedec_424_register(hwaddr base,
                                 DeviceState *qdev, const char *name,
                                 hwaddr size,
                                 BlockBackend *blk,
@@ -1049,7 +959,7 @@ pflash_t *pflash_jedec_424_register(hwaddr base,
     DeviceState *dev = qdev_create(NULL, TYPE_CFI_PFLASH_JEDEC_424);
 
     if (blk) {
-    	qdev_prop_set_drive_nofail(dev, "drive", blk);
+        qdev_prop_set_drive(dev, "drive", blk, &error_fatal);
     }
     qdev_prop_set_uint32(dev, "num-blocks", nb_blocs);
     qdev_prop_set_uint64(dev, "sector-length", sector_len);
@@ -1067,7 +977,7 @@ pflash_t *pflash_jedec_424_register(hwaddr base,
     return CFI_PFLASH_JEDEC(dev);
 }
 
-MemoryRegion *pflash_jedec_424_get_memory(pflash_t *fl)
+static MemoryRegion *pflash_jedec_424_get_memory(PFlashJedec424 *fl)
 {
     return &fl->mem;
 }

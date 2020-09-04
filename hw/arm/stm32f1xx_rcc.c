@@ -20,9 +20,14 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "stm32f1xx_rcc.h"
 #include "qemu/timer.h"
+#include "hw/hw.h"
 #include <stdio.h>
+#include "hw/qdev-properties.h"
+#include "hw/timer/armv7m_systick.h"
+#include "hw/irq.h"
 
 
 /* DEFINITIONS*/
@@ -523,7 +528,7 @@ static const MemoryRegionOps stm32_rcc_ops = {
 
 static void stm32_rcc_reset(DeviceState *dev)
 {
-    Stm32f1xxRcc *s = FROM_SYSBUS(Stm32f1xxRcc, SYS_BUS_DEVICE(dev));
+    Stm32f1xxRcc *s = STM32F1XX_RCC(dev);
 
     stm32_rcc_RCC_CR_write(s, 0x00000083, true);
     stm32_rcc_RCC_CFGR_write(s, 0x00000000, true);
@@ -552,7 +557,7 @@ static void stm32_rcc_hclk_upd_irq_handler(void *opaque, int n, int level)
          * (which is an unchanging number independent of the CPU frequency) to
          * system/external clock ticks.
          */
-        system_clock_scale = get_ticks_per_sec() / hclk_freq;
+        system_clock_scale = NANOSECONDS_PER_SECOND / hclk_freq;
     }
 
 #ifdef DEBUG_STM32_RCC
@@ -636,20 +641,19 @@ static void stm32_rcc_init_clk(Stm32f1xxRcc *s)
     s->PERIPHCLK[STM32F1XX_UART5] = clktree_create_clk("UART5", 1, 1, false, CLKTREE_NO_MAX_FREQ, 0, s->PCLK1, NULL);
 }
 
-static int stm32_rcc_init(SysBusDevice *dev)
+static void stm32_rcc_init(Object *obj)
 {
-    Stm32f1xxRcc *s = FROM_SYSBUS(Stm32f1xxRcc, dev);
+    SysBusDevice *sbd = SYS_BUS_DEVICE(obj);
+    Stm32f1xxRcc *s = STM32F1XX_RCC(obj);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &stm32_rcc_ops, s,
                           "rcc", 0x1000);
 
-    sysbus_init_mmio(dev, &s->iomem);
+    sysbus_init_mmio(sbd, &s->iomem);
 
-    sysbus_init_irq(dev, &s->irq);
+    sysbus_init_irq(sbd, &s->irq);
 
     stm32_rcc_init_clk(s);
-
-    return 0;
 }
 
 
@@ -663,17 +667,16 @@ static Property stm32_rcc_properties[] = {
 static void stm32_rcc_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32_rcc_init;
     dc->reset = stm32_rcc_reset;
-    dc->props = stm32_rcc_properties;
+    device_class_set_props(dc,  stm32_rcc_properties);
 }
 
 static TypeInfo stm32_rcc_info = {
-    .name  = "stm32f1xx_rcc",
+    .name  = TYPE_STM32F1XX_RCC,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size  = sizeof(Stm32f1xxRcc),
+    .instance_init=stm32_rcc_init,
     .class_init = stm32_rcc_class_init
 };
 

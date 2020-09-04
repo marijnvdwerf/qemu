@@ -494,3 +494,7 @@ config ARMSSE_CPUID
 
 config ARMSSE_MHU
     bool
+
+config STM32
+    bool
+    select ARM_V7M

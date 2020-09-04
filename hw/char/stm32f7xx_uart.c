@@ -20,10 +20,13 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/arm/stm32.h"
-#include "sysemu/char.h"
 #include "qemu/bitops.h"
+#include "hw/qdev-properties.h"
+#include "hw/irq.h"
+#include "hw/hw.h"
 
 
 
@@ -648,12 +651,12 @@ void stm32f7xx_uart_get_rcv_handlers(Stm32F7xxUart *s, IOCanReadHandler **can_re
 // Stub used to typecast the generic write handler prototype to a qemu_chr write handler.
 static int stm32f7xx_uart_chr_fe_write_stub(void *s, const uint8_t *buf, int len)
 {
-    return qemu_chr_fe_write((CharDriverState *)s, buf, len);
+    return qemu_chr_fe_write((Chardev *)s, buf, len);
 }
 
 
 // Helper method that connects this UART device's receive handlers to a qemu_chr instance.
-void stm32f7xx_uart_connect(Stm32F7xxUart *s, CharDriverState *chr, uint32_t afio_board_map)
+void stm32f7xx_uart_connect(Stm32F7xxUart *s, Chardev *chr, uint32_t afio_board_map)
 {
     s->chr_write_obj = chr;
     if (chr) {
@@ -662,7 +665,7 @@ void stm32f7xx_uart_connect(Stm32F7xxUart *s, CharDriverState *chr, uint32_t afi
         IOReadHandler *read_cb;
         IOEventHandler *event_cb;
         stm32f7xx_uart_get_rcv_handlers(s, &can_read_cb, &read_cb, &event_cb);
-        qemu_chr_add_handlers(chr, can_read_cb, read_cb, event_cb, s);
+        qemu_chr_fe_set_handlers(&chr, can_read_cb, read_cb, event_cb, NULL, s, NULL, true);
     }
 
     s->afio_board_map = afio_board_map;
@@ -673,10 +676,11 @@ void stm32f7xx_uart_connect(Stm32F7xxUart *s, CharDriverState *chr, uint32_t afi
 
 /* DEVICE INITIALIZATION */
 
-static int stm32f7xx_uart_init(SysBusDevice *dev)
+static void stm32f7xx_uart_init(Object *obj)
 {
     qemu_irq *clk_irq;
-    Stm32F7xxUart *s = STM32F7XX_UART(dev);
+    Stm32F7xxUart *s = STM32F7XX_UART(obj);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
 
     s->stm32_rcc = (Stm32Rcc *)s->stm32_rcc_prop;
     s->stm32_gpio = (Stm32Gpio **)s->stm32_gpio_prop;
@@ -699,8 +703,6 @@ static int stm32f7xx_uart_init(SysBusDevice *dev)
     s->rcv_char_bytes = 0;
 
     stm32f7xx_uart_reset((DeviceState *)s);
-
-    return 0;
 }
 
 static Property stm32f7xx_uart_properties[] = {
@@ -715,17 +717,16 @@ static Property stm32f7xx_uart_properties[] = {
 static void stm32f7xx_uart_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32f7xx_uart_init;
     dc->reset = stm32f7xx_uart_reset;
-    dc->props = stm32f7xx_uart_properties;
+    device_class_set_props(dc, stm32f7xx_uart_properties);
 }
 
 static TypeInfo stm32f7xx_uart_info = {
     .name  = "stm32f7xx-uart",
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size  = sizeof(Stm32F7xxUart),
+    .instance_init = stm32f7xx_uart_init,
     .class_init = stm32f7xx_uart_class_init
 };
 

@@ -1253,11 +1253,7 @@ static int coroutine_fn qcow2_do_open(BlockDriverState *bs, QDict *options,
     Error *local_err = NULL;
     uint64_t ext_end;
     uint64_t l1_vm_state_index;
-<<<<<<< HEAD
     bool update_header = false;
-=======
-    uint64_t l2_cache_size, refcount_cache_size;
->>>>>>> 919b29ba7d... Pebble Qemu
 
     ret = bdrv_pread(bs->file, 0, &header, sizeof(header));
     if (ret < 0) {
@@ -1518,11 +1514,6 @@ static int coroutine_fn qcow2_do_open(BlockDriverState *bs, QDict *options,
     /* Parse driver-specific options */
     ret = qcow2_update_options(bs, options, flags, errp);
     if (ret < 0) {
-        goto fail;
-    }
-    if (s->l2_table_cache == NULL || s->refcount_block_cache == NULL) {
-        error_setg(errp, "Could not allocate metadata caches");
-        ret = -ENOMEM;
         goto fail;
     }
 

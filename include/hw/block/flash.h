@@ -27,7 +27,6 @@ MemoryRegion *pflash_cfi01_get_memory(PFlashCFI01 *fl);
 void pflash_cfi01_legacy_drive(PFlashCFI01 *dev, DriveInfo *dinfo);
 
 /* pflash_cfi02.c */
-<<<<<<< HEAD
 
 #define TYPE_PFLASH_CFI02 "cfi.pflash02"
 #define PFLASH_CFI02(obj) \
@@ -47,29 +46,23 @@ PFlashCFI02 *pflash_cfi02_register(hwaddr base,
                                    uint16_t unlock_addr0,
                                    uint16_t unlock_addr1,
                                    int be);
-=======
-pflash_t *pflash_cfi02_register(hwaddr base,
-                                DeviceState *qdev, const char *name,
-                                hwaddr size,
-                                BlockBackend *blk, uint32_t sector_len,
-                                int nb_blocs, int nb_mappings, int width,
-                                uint16_t id0, uint16_t id1,
-                                uint16_t id2, uint16_t id3,
-                                uint16_t unlock_addr0, uint16_t unlock_addr1,
-                                int be);
+
 
 /* pflash_jedec_424.c */
-pflash_t *pflash_jedec_424_register(hwaddr base,
-                                DeviceState *qdev, const char *name,
-                                hwaddr size,
-                                BlockBackend *blk,
-                                uint32_t sector_len, int nb_blocs, uint32_t bank_size,
-                                int bank_width, uint16_t id0, uint16_t id1,
-                                uint16_t id2, uint16_t id3, int be);
 
-MemoryRegion *pflash_cfi01_get_memory(pflash_t *fl);
-MemoryRegion *pflash_jedec_424_get_memory(pflash_t *fl);
->>>>>>> 919b29ba7d... Pebble Qemu
+#define TYPE_CFI_PFLASH_JEDEC_424 "cfi.pflash.jedec-42.4"
+#define      CFI_PFLASH_JEDEC(obj) \
+    OBJECT_CHECK(PFlashJedec424, (obj), TYPE_CFI_PFLASH_JEDEC_424)
+
+typedef struct PFlashJedec424 PFlashJedec424;
+
+PFlashJedec424 *pflash_jedec_424_register(hwaddr base,
+                                    DeviceState *qdev, const char *name,
+                                    hwaddr size,
+                                    BlockBackend *blk,
+                                    uint32_t sector_len, int nb_blocs, uint32_t bank_size,
+                                    int bank_width, uint16_t id0, uint16_t id1,
+                                    uint16_t id2, uint16_t id3, int be);
 
 /* nand.c */
 DeviceState *nand_init(BlockBackend *blk, int manf_id, int chip_id);
@@ -103,7 +96,4 @@ uint8_t ecc_digest(ECCState *s, uint8_t sample);
 void ecc_reset(ECCState *s);
 extern VMStateDescription vmstate_ecc_state;
 
-typedef struct f2xx_flash f2xx_flash_t;
-f2xx_flash_t *f2xx_flash_register(BlockBackend *blk, hwaddr base,
-                                  hwaddr size);
 #endif

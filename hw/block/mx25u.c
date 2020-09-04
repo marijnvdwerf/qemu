@@ -3,10 +3,15 @@
  * Modelled after the m25p80 emulation found in hw/block/m25p80.c
  */
 
+#include "qemu/osdep.h"
+#include "qapi/error.h"
+#include "qemu/log.h"
 #include "hw/hw.h"
+#include "migration/vmstate.h"
 #include "sysemu/block-backend.h"
 #include "sysemu/blockdev.h"
-#include "hw/ssi.h"
+#include "hw/qdev-properties.h"
+#include "hw/ssi/ssi.h"
 
 
 // TODO: These should be made configurable to support different flash parts
@@ -152,7 +157,7 @@ mx25u_flash_sync_page(Flash *s, int page)
     qemu_iovec_init(&iov, 1);
     qemu_iovec_add(&iov, s->storage + blk_sector * BDRV_SECTOR_SIZE,
                    nb_sectors * BDRV_SECTOR_SIZE);
-    blk_aio_writev(s->blk, blk_sector, &iov, nb_sectors, blk_sync_complete,
+    blk_aio_pwritev(s->blk, (page * s->page_size), &iov, 0, blk_sync_complete,
                    NULL);
 }
 
@@ -173,7 +178,7 @@ mx25u_flash_sync_area(Flash *s, int64_t off, int64_t len)
     qemu_iovec_init(&iov, 1);
     qemu_iovec_add(&iov, s->storage + (start * BDRV_SECTOR_SIZE),
                                         nb_sectors * BDRV_SECTOR_SIZE);
-    blk_aio_writev(s->blk, start, &iov, nb_sectors, blk_sync_complete, NULL);
+    blk_aio_pwritev(s->blk, off, &iov, 0, blk_sync_complete, NULL);
 }
 
 static inline void
@@ -414,8 +419,8 @@ mx25u_transfer8(SSISlave *ss, uint32_t tx)
     return r;
 }
 
-static int
-mx25u_init(SSISlave *ss)
+static void
+mx25u_realize(SSISlave *ss, Error **errp)
 {
     DriveInfo *dinfo;
     Flash *s = MX25U(ss);
@@ -426,28 +431,19 @@ mx25u_init(SSISlave *ss)
     s->dirty_page = -1;
     s->SR = 0;
 
-    /* FIXME use a qdev drive property instead of drive_get_next() */
-    dinfo = drive_get_next(IF_MTD);
-
-    if (dinfo) {
+    if (s->blk) {
         DB_PRINT_L(0, "Binding to IF_MTD drive");
-        s->blk = blk_by_legacy_dinfo(dinfo);
-        blk_attach_dev_nofail(s->blk, s);
-
         s->storage = blk_blockalign(s->blk, s->size);
 
-        /* FIXME: Move to late init */
-        if (blk_read(s->blk, 0, s->storage,
-                     DIV_ROUND_UP(s->size, BDRV_SECTOR_SIZE))) {
-            fprintf(stderr, "Failed to initialize SPI flash!\n");
-            return 1;
+        if (blk_pread(s->blk, 0, s->storage, s->size) != s->size) {
+            error_setg(errp, "Failed to initialize SPI flash!");
+            return;
         }
     } else {
         DB_PRINT_L(0, "No BDRV - binding to RAM");
         s->storage = blk_blockalign(NULL, s->size);
         memset(s->storage, 0xFF, s->size);
     }
-    return 0;
 }
 
 static int
@@ -467,10 +463,12 @@ mx25u_cs(SSISlave *ss, bool select)
     return 0;
 }
 
-static void
+static int
 mx25u_pre_save(void *opaque)
 {
     flash_sync_dirty((Flash *)opaque, -1);
+
+    return 0;
 }
 
 static const VMStateDescription vmstate_mx25u = {
@@ -494,17 +492,23 @@ static const VMStateDescription vmstate_mx25u = {
     }
 };
 
+static Property mx25u_properties[] = {
+    DEFINE_PROP_DRIVE("drive", Flash, blk),
+    DEFINE_PROP_END_OF_LIST(),
+};
+
 static void
 mx25u_class_init(ObjectClass *class, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(class);
     SSISlaveClass *c = SSI_SLAVE_CLASS(class);
 
-    c->init = mx25u_init;
+    c->realize = mx25u_realize;
     c->transfer = mx25u_transfer8;
     c->set_cs = mx25u_cs;
     c->cs_polarity = SSI_CS_LOW;
     dc->vmsd = &vmstate_mx25u;
+    device_class_set_props(dc, mx25u_properties);
     //mc->pi = data;
 }
 

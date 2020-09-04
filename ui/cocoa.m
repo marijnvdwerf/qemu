@@ -544,10 +544,13 @@ QemuCocoaView *cocoaView;
         [[fullScreenWindow contentView] setFrame:[[NSScreen mainScreen] frame]];
         [normalWindow setFrame:NSMakeRect([normalWindow frame].origin.x, [normalWindow frame].origin.y - h + oldh, w, h + [normalWindow frame].size.height - oldh) display:NO animate:NO];
     } else {
-        if (qemu_name) {
+        if (qemu_name)
             [normalWindow setTitle:[NSString stringWithFormat:@"QEMU %s", qemu_name]];
-        }
         [normalWindow setFrame:NSMakeRect([normalWindow frame].origin.x, [normalWindow frame].origin.y - h + oldh, w, h + [normalWindow frame].size.height - oldh) display:YES animate:NO];
+    }
+
+    if (isResize) {
+        [normalWindow center];
     }
 }
 
@@ -1093,19 +1096,9 @@ QemuCocoaView *cocoaView;
 
         // set the supported image file types that can be opened
         supportedImageFileTypes = [NSArray arrayWithObjects: @"img", @"iso", @"dmg",
-<<<<<<< HEAD
                                  @"qcow", @"qcow2", @"cloop", @"vmdk", @"cdr",
                                   @"toast", nil];
         [self make_about_window];
-=======
-                                 @"qcow", @"qcow2", @"cloop", @"vmdk", nil];
-
-        // Save window position
-        [[normalWindow windowController] setShouldCascadeWindows:NO];
-        [normalWindow setFrameAutosaveName:@"normalWindow"];
-
-        [normalWindow makeKeyAndOrderFront:self];
->>>>>>> 919b29ba7d... Pebble Qemu
     }
     return self;
 }
@@ -1597,24 +1590,6 @@ static void create_initial_menus(void)
     menuItem = [[[NSMenuItem alloc] initWithTitle:@"Window" action:nil keyEquivalent:@""] autorelease];
     [menuItem setSubmenu:menu];
     [[NSApp mainMenu] addItem:menuItem];
-<<<<<<< HEAD
-=======
-
-    // Create an Application controller
-    QemuCocoaAppController *appController = [[QemuCocoaAppController alloc] init];
-    [NSApp setDelegate:appController];
-
-    // Bring application to the front of all windows
-    [NSApp activateIgnoringOtherApps:YES];
-    
-    // Start the main event loop
-    [NSApp run];
-
-    [appController release];
-    [pool release];
-
-    return 0;
->>>>>>> 919b29ba7d... Pebble Qemu
 }
 
 /* Returns a name for a given console */

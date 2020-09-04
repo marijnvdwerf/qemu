@@ -1,14 +1,8 @@
 #######################################################################
 # Common libraries for tools and emulators
 stub-obj-y = stubs/
-<<<<<<< HEAD
 util-obj-y = crypto/ util/ qobject/ qapi/
 qom-obj-y = qom/
-=======
-util-obj-y = util/ qobject/ qapi/
-util-obj-y += crypto/
-util-obj-y += qmp-introspect.o qapi-types.o qapi-visit.o qapi-event.o
->>>>>>> 919b29ba7d... Pebble Qemu
 
 #######################################################################
 # code used by both qemu system emulation and qemu-img

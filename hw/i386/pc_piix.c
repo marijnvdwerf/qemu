@@ -71,7 +71,7 @@ static const int ide_irq[MAX_IDE_BUS] = { 14, 15 };
 #endif
 
 /* PC hardware initialisation */
-static void pc_init1(MachineState *machine)
+static void pc_init1(MachineState *machine,
                      const char *host_type, const char *pci_type)
 {
     PCMachineState *pcms = PC_MACHINE(machine);
@@ -808,196 +808,6 @@ DEFINE_I440FX_MACHINE(v1_0, "pc-1.0", pc_compat_1_2,
                       pc_i440fx_1_0_machine_options);
 
 
-<<<<<<< HEAD
-=======
-#define PC_COMPAT_0_15 \
-        PC_COMPAT_1_0
-
-static void pc_i440fx_0_15_machine_options(MachineClass *m)
-{
-    pc_i440fx_1_0_machine_options(m);
-    m->hw_version = "0.15";
-    SET_MACHINE_COMPAT(m, PC_COMPAT_0_15);
-}
-
-DEFINE_I440FX_MACHINE(v0_15, "pc-0.15", pc_compat_1_2,
-                      pc_i440fx_0_15_machine_options);
-
-
-#define PC_COMPAT_0_14 \
-        PC_COMPAT_0_15 \
-        {\
-            .driver   = "virtio-blk-pci",\
-            .property = "event_idx",\
-            .value    = "off",\
-        },{\
-            .driver   = "virtio-serial-pci",\
-            .property = "event_idx",\
-            .value    = "off",\
-        },{\
-            .driver   = "virtio-net-pci",\
-            .property = "event_idx",\
-            .value    = "off",\
-        },{\
-            .driver   = "virtio-balloon-pci",\
-            .property = "event_idx",\
-            .value    = "off",\
-        },{\
-            .driver   = "qxl",\
-            .property = "revision",\
-            .value    = stringify(2),\
-        },{\
-            .driver   = "qxl-vga",\
-            .property = "revision",\
-            .value    = stringify(2),\
-        },
-
-static void pc_i440fx_0_14_machine_options(MachineClass *m)
-{
-    pc_i440fx_0_15_machine_options(m);
-    m->hw_version = "0.14";
-    SET_MACHINE_COMPAT(m, PC_COMPAT_0_14);
-}
-
-DEFINE_I440FX_MACHINE(v0_14, "pc-0.14", pc_compat_1_2,
-                      pc_i440fx_0_14_machine_options);
-
-
-#define PC_COMPAT_0_13 \
-        PC_COMPAT_0_14 \
-        {\
-            .driver   = TYPE_PCI_DEVICE,\
-            .property = "command_serr_enable",\
-            .value    = "off",\
-        },{\
-            .driver   = "AC97",\
-            .property = "use_broken_id",\
-            .value    = stringify(1),\
-        },{\
-            .driver   = "virtio-9p-pci",\
-            .property = "vectors",\
-            .value    = stringify(0),\
-        },{\
-            .driver   = "VGA",\
-            .property = "rombar",\
-            .value    = stringify(0),\
-        },{\
-            .driver   = "vmware-svga",\
-            .property = "rombar",\
-            .value    = stringify(0),\
-        },
-
-static void pc_i440fx_0_13_machine_options(MachineClass *m)
-{
-    pc_i440fx_0_14_machine_options(m);
-    m->hw_version = "0.13";
-    SET_MACHINE_COMPAT(m, PC_COMPAT_0_13);
-}
-
-DEFINE_I440FX_MACHINE(v0_13, "pc-0.13", pc_compat_0_13,
-                      pc_i440fx_0_13_machine_options);
-
-
-#define PC_COMPAT_0_12 \
-        PC_COMPAT_0_13 \
-        {\
-            .driver   = "virtio-serial-pci",\
-            .property = "max_ports",\
-            .value    = stringify(1),\
-        },{\
-            .driver   = "virtio-serial-pci",\
-            .property = "vectors",\
-            .value    = stringify(0),\
-        },{\
-            .driver   = "usb-mouse",\
-            .property = "serial",\
-            .value    = "1",\
-        },{\
-            .driver   = "usb-tablet",\
-            .property = "serial",\
-            .value    = "1",\
-        },{\
-            .driver   = "usb-kbd",\
-            .property = "serial",\
-            .value    = "1",\
-        },
-
-static void pc_i440fx_0_12_machine_options(MachineClass *m)
-{
-    pc_i440fx_0_13_machine_options(m);
-    m->hw_version = "0.12";
-    SET_MACHINE_COMPAT(m, PC_COMPAT_0_12);
-}
-
-DEFINE_I440FX_MACHINE(v0_12, "pc-0.12", pc_compat_0_13,
-                      pc_i440fx_0_12_machine_options);
-
-
-#define PC_COMPAT_0_11 \
-        PC_COMPAT_0_12 \
-        {\
-            .driver   = "virtio-blk-pci",\
-            .property = "vectors",\
-            .value    = stringify(0),\
-        },{\
-            .driver   = TYPE_PCI_DEVICE,\
-            .property = "rombar",\
-            .value    = stringify(0),\
-        },{\
-            .driver   = "ide-drive",\
-            .property = "ver",\
-            .value    = "0.11",\
-        },{\
-            .driver   = "scsi-disk",\
-            .property = "ver",\
-            .value    = "0.11",\
-        },
-static void pc_i440fx_0_11_machine_options(MachineClass *m)
-{
-    pc_i440fx_0_12_machine_options(m);
-    m->hw_version = "0.11";
-    SET_MACHINE_COMPAT(m, PC_COMPAT_0_11);
-}
-
-DEFINE_I440FX_MACHINE(v0_11, "pc-0.11", pc_compat_0_13,
-                      pc_i440fx_0_11_machine_options);
-
-
-#define PC_COMPAT_0_10 \
-    PC_COMPAT_0_11 \
-    {\
-        .driver   = "virtio-blk-pci",\
-        .property = "class",\
-        .value    = stringify(PCI_CLASS_STORAGE_OTHER),\
-    },{\
-        .driver   = "virtio-serial-pci",\
-        .property = "class",\
-        .value    = stringify(PCI_CLASS_DISPLAY_OTHER),\
-    },{\
-        .driver   = "virtio-net-pci",\
-        .property = "vectors",\
-        .value    = stringify(0),\
-    },{\
-        .driver   = "ide-drive",\
-        .property = "ver",\
-        .value    = "0.10",\
-    },{\
-        .driver   = "scsi-disk",\
-        .property = "ver",\
-        .value    = "0.10",\
-        },
-
-static void pc_i440fx_0_10_machine_options(MachineClass *m)
-{
-    pc_i440fx_0_11_machine_options(m);
-    m->hw_version = "0.10";
-    SET_MACHINE_COMPAT(m, PC_COMPAT_0_10);
-}
-
-DEFINE_I440FX_MACHINE(v0_10, "pc-0.10", pc_compat_0_13,
-                      pc_i440fx_0_10_machine_options);
-
->>>>>>> 919b29ba7d... Pebble Qemu
 typedef struct {
     uint16_t gpu_device_id;
     uint16_t pch_device_id;
@@ -1052,6 +862,7 @@ static const IGDDeviceIDInfo igd_combo_id_infos[] = {
     {0x162B, 0x9cc3, 0x03}, /* BDWHALO28W, BDWM_w7 */
     {0x162A, 0x9cc3, 0x03}, /* BDWGT3WRKS, BDWM_w7 */
     {0x162D, 0x9cc3, 0x03}, /* BDWGT3SRVR, BDWM_w7 */
+};
 
 static void isa_bridge_class_init(ObjectClass *klass, void *data)
 {
@@ -1062,6 +873,7 @@ static void isa_bridge_class_init(ObjectClass *klass, void *data)
     set_bit(DEVICE_CATEGORY_BRIDGE, dc->categories);
     k->vendor_id    = PCI_VENDOR_ID_INTEL;
     k->class_id     = PCI_CLASS_BRIDGE_ISA;
+};
 
 static TypeInfo isa_bridge_info = {
     .name          = "igd-passthrough-isa-bridge",
@@ -1081,10 +893,6 @@ static void pt_graphics_register_types(void)
 type_init(pt_graphics_register_types)
 
 void igd_passthrough_isa_bridge_create(PCIBus *bus, uint16_t gpu_dev_id)
-                      pc_i440fx_0_10_machine_options);
-
-
-static void isapc_machine_options(MachineClass *m)
 {
     struct PCIDevice *bridge_dev;
     int i, num;

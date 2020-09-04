@@ -68,14 +68,7 @@ struct SysBusDevice {
     uint32_t pio[QDEV_MAX_PIO];
 };
 
-<<<<<<< HEAD
 typedef void FindSysbusDeviceFunc(SysBusDevice *sbdev, void *opaque);
-=======
-/* Macros to compensate for lack of type inheritance in C.  */
-#define FROM_SYSBUS(type, dev) DO_UPCAST(type, busdev, dev)
-
-typedef int FindSysbusDeviceFunc(SysBusDevice *sbdev, void *opaque);
->>>>>>> 919b29ba7d... Pebble Qemu
 
 void sysbus_init_mmio(SysBusDevice *dev, MemoryRegion *memory);
 MemoryRegion *sysbus_mmio_get_region(SysBusDevice *dev, int n);

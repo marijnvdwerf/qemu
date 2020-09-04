@@ -23,8 +23,11 @@
  * QEMU model of the stm32f2xx GPIO module
  */
 
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/arm/stm32.h"
+#include "hw/irq.h"
+#include "hw/qdev-properties.h"
 
 //#define DEBUG_STM32_GPIO
 #ifdef DEBUG_STM32_GPIO
@@ -179,7 +182,7 @@ static const MemoryRegionOps stm32f2xx_gpio_ops = {
 static void
 stm32f2xx_gpio_reset(DeviceState *dev)
 {
-    stm32f2xx_gpio *s = FROM_SYSBUS(stm32f2xx_gpio, SYS_BUS_DEVICE(dev));
+    stm32f2xx_gpio *s = STM32F2XX_GPIO(dev);
 
     switch (s->periph) {
     case 0:
@@ -237,10 +240,11 @@ f2xx_gpio_wake_set(stm32f2xx_gpio *s, unsigned pin, qemu_irq irq)
     DPRINTF("GPIO %d set cpu_wake %d irq %p\n", s->periph, pin, irq);
 }
 
-static int
-stm32f2xx_gpio_init(SysBusDevice *dev)
+static void
+stm32f2xx_gpio_init(Object *obj)
 {
-    stm32f2xx_gpio *s = FROM_SYSBUS(stm32f2xx_gpio, dev);
+    stm32f2xx_gpio *s = STM32F2XX_GPIO(obj);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &stm32f2xx_gpio_ops, s, "gpio", 0x400);
     sysbus_init_mmio(dev, &s->iomem);
@@ -248,8 +252,6 @@ stm32f2xx_gpio_init(SysBusDevice *dev)
     qdev_init_gpio_in(DEVICE(dev), f2xx_gpio_set, STM32_GPIO_PIN_COUNT);
     qdev_init_gpio_out(DEVICE(dev), s->pin, STM32_GPIO_PIN_COUNT);
     qdev_init_gpio_out_named(DEVICE(dev), s->alternate_function, "af", STM32_GPIO_PIN_COUNT);
-
-    return 0;
 }
 
 static Property stm32f2xx_gpio_properties[] = {
@@ -262,17 +264,16 @@ static void
 stm32f2xx_gpio_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(klass);
 
-    sc->init = stm32f2xx_gpio_init;
     dc->reset = stm32f2xx_gpio_reset;
-    dc->props = stm32f2xx_gpio_properties;
+    device_class_set_props(dc, stm32f2xx_gpio_properties);
 }
 
 static const TypeInfo stm32f2xx_gpio_info = {
-    .name = "stm32f2xx_gpio",
+    .name = TYPE_STM32F2XX_GPIO,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(stm32f2xx_gpio),
+    .instance_init = stm32f2xx_gpio_init,
     .class_init = stm32f2xx_gpio_class_init
 };
 

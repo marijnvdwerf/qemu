@@ -29,7 +29,10 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/arm/stm32.h"
+#include "hw/hw.h"
+#include "hw/qdev-properties.h"
 //#include "exec-memory.h"
 
 typedef struct {
@@ -62,9 +65,10 @@ static const MemoryRegionOps stm32_flash_ops = {
     .endianness = DEVICE_NATIVE_ENDIAN
 };
 
-static int stm32_flash_init(SysBusDevice *dev)
+static void stm32_flash_init(Object *obj)
 {
-    Stm32Flash *s = FROM_SYSBUS(Stm32Flash, dev);
+    Stm32Flash *s = STM32_FLASH(obj);
+    SysBusDevice *sbd = SYS_BUS_DEVICE(obj);
 
     memory_region_init_io(
             &s->iomem,
@@ -73,8 +77,7 @@ static int stm32_flash_init(SysBusDevice *dev)
             &s,
             "stm32_flash",
             s->size);
-    sysbus_init_mmio(dev, &s->iomem);
-    return 0;
+    sysbus_init_mmio(sbd, &s->iomem);
 }
 
 static Property stm32_flash_properties[] = {
@@ -85,16 +88,15 @@ static Property stm32_flash_properties[] = {
 static void stm32_flash_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32_flash_init;
-    dc->props = stm32_flash_properties;
+    device_class_set_props(dc, stm32_flash_properties);
 }
 
 static TypeInfo stm32_flash_info = {
-    .name          = "stm32_flash",
+    .name          = TYPE_STM32_FLASH,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(Stm32Flash),
+    .instance_init = stm32_flash_init,
     .class_init    = stm32_flash_class_init,
 };
 

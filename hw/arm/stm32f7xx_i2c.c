@@ -24,9 +24,13 @@
  * QEMU model of the stm32f7xx I2C controller.
  */
 
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/arm/stm32.h"
 #include "hw/i2c/i2c.h"
+#include "hw/hw.h"
+#include "hw/qdev-properties.h"
+#include "hw/irq.h"
 
 #define R_I2C_CR1       (0x00 / 4)
 #define R_I2C_CR2       (0x04 / 4)
@@ -207,9 +211,10 @@ static void stm32f7xx_i2c_reset(DeviceState *dev)
 {
 }
 
-static int stm32f7xx_i2c_init(SysBusDevice *dev)
+static void stm32f7xx_i2c_init(Object *obj)
 {
-    struct stm32f7xx_i2c *s = FROM_SYSBUS(struct stm32f7xx_i2c, dev);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    struct stm32f7xx_i2c *s = STM32F7XX_I2C(obj);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &stm32f7xx_i2c_ops, s, "i2c", 0x3ff);
     sysbus_init_mmio(dev, &s->iomem);
@@ -218,7 +223,6 @@ static int stm32f7xx_i2c_init(SysBusDevice *dev)
     s->bus = i2c_init_bus(DEVICE(dev), "i2c");
 
     DPRINTF("%s %s: INITIALIZED\n", __func__, s->busdev.parent_obj.id);
-    return 0;
 }
 
 
@@ -232,15 +236,15 @@ static void stm32f7xx_i2c_class_init(ObjectClass *c, void *data)
     DeviceClass *dc = DEVICE_CLASS(c);
     SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(c);
 
-    sc->init = stm32f7xx_i2c_init;
     dc->reset = stm32f7xx_i2c_reset;
-    dc->props = stm32f7xx_i2c_properties;
+    device_class_set_props(dc, stm32f7xx_i2c_properties);
 }
 
 static const TypeInfo stm32f7xx_i2c_info = {
-    .name = "stm32f7xx_i2c",
+    .name = TYPE_STM32F7XX_I2C,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(struct stm32f7xx_i2c),
+    .instance_init = stm32f7xx_i2c_init,
     .class_init = stm32f7xx_i2c_class_init
 };
 

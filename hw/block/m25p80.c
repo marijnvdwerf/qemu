@@ -362,7 +362,6 @@ typedef enum {
     ERASE_32K = 0x52,
     ERASE4_32K = 0x5c,
     ERASE_SECTOR = 0xd8,
-<<<<<<< HEAD
     ERASE4_SECTOR = 0xdc,
 
     EN_4BYTE_ADDR = 0xB7,
@@ -391,11 +390,9 @@ typedef enum {
     WEVCR = 0x61,
 
     DIE_ERASE = 0xC4,
-=======
 
     SLEEP = 0xb9,
     WAKE = 0xab,
->>>>>>> 919b29ba7d... Pebble Qemu
 } FlashCMD;
 
 typedef enum {
@@ -1076,7 +1073,7 @@ static void decode_new_cmd(Flash *s, uint32_t value)
         break;
     case NOP:
     case SLEEP:
-    case WAKE:
+//    case WAKE:
         break;
     case EN_4BYTE_ADDR:
         s->four_bytes_address_mode = true;

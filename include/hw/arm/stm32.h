@@ -23,12 +23,94 @@
 #define STM32_H
 
 #include "qemu/timer.h"
-#include "hw/arm/arm.h"
 #include "qemu-common.h"
 #include "hw/sysbus.h"
+#include "hw/arm/boot.h"
 #include "qemu/log.h"
-#include "sysemu/char.h"
+#include "chardev/char-fe.h"
+#include "hw/qdev-properties.h"
+#include "hw/core/cpu.h"
+#include "qapi/error.h"
 
+#define qdev_prop_set_ptr(a, b, c) qdev_prop_set_uint64((a), (b), (uint64_t)(c))
+#define DEFINE_PROP_PTR(_n, _s, _f) \
+    DEFINE_PROP(_n, _s, _f, qdev_prop_uint64, void*)
+
+#define TYPE_STM32_FLASH "stm32_flash"
+#define      STM32_FLASH(obj) \
+    OBJECT_CHECK(Stm32Flash, (obj), TYPE_STM32_FLASH)
+
+#define TYPE_STM32_ADC "stm32f2xx_adc"
+#define      STM32_ADC(obj) \
+    OBJECT_CHECK(stm32_adc, (obj), TYPE_STM32_ADC)
+
+#define TYPE_STM32F2XX_CRC "f2xx_crc"
+#define      STM32F2XX_CRC(obj) \
+    OBJECT_CHECK(f2xx_crc, (obj), TYPE_STM32F2XX_CRC)
+
+#define TYPE_STM32F2XX_DMA "f2xx_dma"
+#define      STM32F2XX_DMA(obj) \
+    OBJECT_CHECK(f2xx_dma, (obj), TYPE_STM32F2XX_DMA)
+
+#define TYPE_STM32F412_QSPI "stm32f412_qspi"
+#define      STM32F412_QSPI(obj) \
+    OBJECT_CHECK(struct stm32f412_qspi_s, (obj), TYPE_STM32F412_QSPI)
+
+#define TYPE_STM32F2XX_SPI "stm32f2xx_spi"
+#define      STM32F2XX_SPI(obj) \
+    OBJECT_CHECK(struct stm32f2xx_spi_s, (obj), TYPE_STM32F2XX_SPI)
+
+#define TYPE_STM32F7XX_LPTIM "f7xx_lptim"
+#define      STM32F7XX_LPTIM(obj) \
+    OBJECT_CHECK(f7xx_lptim, (obj), TYPE_STM32F7XX_LPTIM)
+
+#define TYPE_STM32F2XX_FLASH "f2xx.flash"
+#define      STM32F2XX_FLASH(obj) \
+    OBJECT_CHECK(f2xx_flash_t, (obj), TYPE_STM32F2XX_FLASH)
+
+#define TYPE_STM32F2XX_GPIO "stm32f2xx_gpio"
+#define      STM32F2XX_GPIO(obj) \
+    OBJECT_CHECK(stm32f2xx_gpio, (obj), TYPE_STM32F2XX_GPIO)
+
+#define TYPE_STM32F2XX_RCC "stm32f2xx_rcc"
+#define      STM32F2XX_RCC(obj) \
+    OBJECT_CHECK(Stm32f2xxRcc, (obj), TYPE_STM32F2XX_RCC)
+
+#define TYPE_STM32F2XX_TIM "f2xx_tim"
+#define      STM32F2XX_TIM(obj) \
+    OBJECT_CHECK(f2xx_tim, (obj), TYPE_STM32F2XX_TIM)
+
+#define TYPE_STM32F1XX_RCC "stm32f1xx_rcc"
+#define      STM32F1XX_RCC(obj) \
+    OBJECT_CHECK(Stm32f1xxRcc, (obj), TYPE_STM32F1XX_RCC)
+
+#define TYPE_STM32F2XX_SYSCFG "stm32f2xx_syscfg"
+#define      STM32F2XX_SYSCFG(obj) \
+    OBJECT_CHECK(Stm32Syscfg, (obj), TYPE_STM32F2XX_SYSCFG)
+
+#define TYPE_STM32F2XX_SPI_PBL "stm32f2xx_spi_pbl"
+#define      STM32F2XX_SPI_PBL(obj) \
+    OBJECT_CHECK(stm32f2xx_spi_s, (obj), TYPE_STM32F2XX_SPI_PBL)
+
+#define TYPE_STM32F2XX_RTC "f2xx_rtc"
+#define      STM32F2XX_RTC(obj) \
+    OBJECT_CHECK(f2xx_rtc, (obj), TYPE_STM32F2XX_RTC)
+
+#define TYPE_STM32F2XX_DUMMY "f2xx_dummy"
+#define      STM32F2XX_DUMMY(obj) \
+    OBJECT_CHECK(f2xx_dummy, (obj), TYPE_STM32F2XX_DUMMY)
+
+#define TYPE_STM32F2XX_PWR "f2xx_pwr"
+#define      STM32F2XX_PWR(obj) \
+    OBJECT_CHECK(f2xx_pwr, (obj), TYPE_STM32F2XX_PWR)
+
+#define TYPE_STM32F2XX_I2C "f2xx_i2c"
+#define      STM32F2XX_I2C(obj) \
+    OBJECT_CHECK(f2xx_i2c, (obj), TYPE_STM32F2XX_I2C)
+
+#define TYPE_STM32F7XX_I2C "stm32f7xx_i2c"
+#define      STM32F7XX_I2C(obj) \
+    OBJECT_CHECK(stm32f7xx_i2c, (obj), TYPE_STM32F7XX_I2C)
 
 #define ENUM_STRING(x) [x] = #x
 #define ARRAY_LENGTH(array) (sizeof((array))/sizeof((array)[0]))
@@ -97,36 +179,36 @@ typedef int32_t stm32_periph_t;
 
 enum {
     STM32_PERIPH_UNDEFINED = -1,
-    STM32_RCC_PERIPH = 0,
-    STM32_GPIOA,
-    STM32_GPIOB,
-    STM32_GPIOC,
-    STM32_GPIOD,
-    STM32_GPIOE,
-    STM32_GPIOF,
-    STM32_GPIOG,
-    STM32_GPIOH,
-    STM32_GPIOI,
-    STM32_GPIOJ,
-    STM32_GPIOK,
-    STM32_SYSCFG,
-    STM32_AFIO_PERIPH,
-    STM32_UART1,
-    STM32_UART2,
-    STM32_UART3,
-    STM32_UART4,
-    STM32_UART5,
-    STM32_UART6,
-    STM32_UART7,
-    STM32_UART8,
-    STM32_ADC1,
-    STM32_ADC2,
-    STM32_ADC3,
-    STM32_DAC,
-    STM32_TIM1,
-    STM32_TIM2,
-    STM32_TIM3,
-    STM32_TIM4,
+    STM32_RCC_PERIPH = 0, // 0
+    STM32_GPIOA, // 1
+    STM32_GPIOB, // 2
+    STM32_GPIOC, // 3
+    STM32_GPIOD, // 4
+    STM32_GPIOE, // 5
+    STM32_GPIOF, // 6
+    STM32_GPIOG, // 7
+    STM32_GPIOH, // 8
+    STM32_GPIOI, // 9
+    STM32_GPIOJ, // 10
+    STM32_GPIOK, // 11
+    STM32_SYSCFG, // 12
+    STM32_AFIO_PERIPH, // 13
+    STM32_UART1, // 14
+    STM32_UART2, // 15
+    STM32_UART3, // 16
+    STM32_UART4, // 17
+    STM32_UART5, // 18
+    STM32_UART6, // 19
+    STM32_UART7, // 20
+    STM32_UART8, // 21
+    STM32_ADC1, // 22
+    STM32_ADC2, // 23
+    STM32_ADC3, // 24
+    STM32_DAC, // 25
+    STM32_TIM1, // 26
+    STM32_TIM2, // 27
+    STM32_TIM3, // 28
+    STM32_TIM4, // 29
     STM32_TIM5,
     STM32_TIM6,
     STM32_TIM7,
@@ -302,6 +384,9 @@ typedef struct Stm32Exti Stm32Exti;
 #define TYPE_STM32_EXTI "stm32-exti"
 #define STM32_EXTI(obj) OBJECT_CHECK(Stm32Exti, (obj), TYPE_STM32_EXTI)
 
+#define TYPE_STM32_EXTI_ALT "stm32-exti-alt"
+#define      STM32_EXTI_ALT(obj) OBJECT_CHECK(Stm32Exti, (obj), TYPE_STM32_EXTI_ALT)
+
 /* Assigns the specified EXTI line to the specified GPIO. */
 void stm32_exti_set_gpio(Stm32Exti *s, unsigned exti_line, const uint8_t gpio_index);
 
@@ -405,12 +490,12 @@ typedef struct Stm32Uart Stm32Uart;
  * board's pin mapping should be passed in.  This will be used to
  * verify the correct mapping is configured by the software.
  */
-void stm32_uart_connect(Stm32Uart *s, CharDriverState *chr,
+void stm32_uart_connect(Stm32Uart *s, Chardev *chr,
                         uint32_t afio_board_map);
 
 /* Low level methods that let you connect a UART device to any other instance
  * that has read/write handlers. These can be used in place of stm32_uart_connect
- * if not connecting to a CharDriverState instance. */
+ * if not connecting to a Chardev instance. */
 void stm32_uart_set_write_handler(Stm32Uart *s, void *obj,
         int (*chr_write_handler)(void *chr_write_obj, const uint8_t *buf, int len));
 void stm32_uart_get_rcv_handlers(Stm32Uart *s, IOCanReadHandler **can_read,
@@ -439,12 +524,12 @@ typedef struct Stm32F7xxUart Stm32F7xxUart;
  * board's pin mapping should be passed in.  This will be used to
  * verify the correct mapping is configured by the software.
  */
-void stm32f7xx_uart_connect(Stm32F7xxUart *s, CharDriverState *chr,
+void stm32f7xx_uart_connect(Stm32F7xxUart *s, Chardev *chr,
                         uint32_t afio_board_map);
 
 /* Low level methods that let you connect a UART device to any other instance
  * that has read/write handlers. These can be used in place of stm32_uart_connect
- * if not connecting to a CharDriverState instance. */
+ * if not connecting to a Chardev instance. */
 void stm32f7xx_uart_set_write_handler(Stm32F7xxUart *s, void *obj,
         int (*chr_write_handler)(void *chr_write_obj, const uint8_t *buf, int len));
 void stm32f7xx_uart_get_rcv_handlers(Stm32F7xxUart *s, IOCanReadHandler **can_read,
@@ -551,4 +636,47 @@ void stm32f7xx_init(
                     struct stm32f7xx *stm,
                     ARMCPU **cpu);
 
+static inline DeviceState *
+armv7m_translated_init(Object *parent, MemoryRegion *system_memory,
+                                    int flash_size, int sram_size, int num_irq,
+                                    const char *kernel_filename,
+                                    uint64_t (*translate_fn)(void *, uint64_t),
+                                    void *translate_opaque,
+                                    const char *cpu_model,
+                                    ARMCPU **cpu_device) {
+
+    if (sram_size) {
+
+        MemoryRegion *sram = g_new(MemoryRegion, 1);
+        memory_region_init_ram(sram, NULL, "armv7m.sram", sram_size, &error_fatal);
+        memory_region_add_subregion(system_memory, 0x20000000, sram);
+    }
+
+    DeviceState *armv7m = qdev_create(NULL, "armv7m");
+    qdev_prop_set_string(DEVICE(armv7m), "cpu-type", cpu_model);
+    qdev_prop_set_uint32(DEVICE(armv7m), "num-irq", num_irq);
+    qdev_prop_set_bit(DEVICE(armv7m), "enable-bitband", true);
+    object_property_set_link(OBJECT(armv7m), OBJECT(system_memory),
+                             "memory", NULL);
+    qdev_init_nofail(DEVICE(armv7m));
+
+
+    armv7m_load_kernel(ARM_CPU(first_cpu), kernel_filename, flash_size);
+    cpu_device = armv7m;
+    return armv7m;
+}
+
+static inline DeviceState *
+armv7m_init(Object *parent, MemoryRegion *system_memory,
+                         int flash_size, int sram_size, int num_irq,
+                         const char *kernel_filename, const char *cpu_model)
+{
+    ARMCPU *cpu;
+    return armv7m_translated_init(parent, system_memory, flash_size, sram_size, num_irq,
+                                  kernel_filename, NULL, NULL, cpu_model, &cpu);
+}
+
+typedef struct f2xx_flash f2xx_flash_t;
+f2xx_flash_t *f2xx_flash_register(BlockBackend *blk, hwaddr base,
+                                  hwaddr size);
 #endif /* STM32_H */

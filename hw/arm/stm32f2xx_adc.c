@@ -23,7 +23,10 @@
  * QEMU model of the stm32f2xx ADC.
  */
 
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
+#include "hw/arm/stm32.h"
+#include "hw/qdev-properties.h"
 
 /* Per-ADC registers */
 #define R_ADC_SR             (0x00 / 4)
@@ -194,17 +197,18 @@ static const MemoryRegionOps stm32f2xx_adc_ops = {
 static void
 f2xx_adc_reset(DeviceState *ds)
 {
-    stm32_adc *s = FROM_SYSBUS(stm32_adc, SYS_BUS_DEVICE(ds));
+    stm32_adc *s = STM32_ADC(ds);
 
     /* Hack for low ambient light level (2500) */
     s->regs[0][R_ADC_DR] = 2730;
     s->regs[1][R_ADC_DR] = 2500;
 }
 
-static int
-stm32f2xx_adc_init(SysBusDevice *dev)
+static void
+stm32f2xx_adc_init(Object *obj)
 {
-    stm32_adc *s = FROM_SYSBUS(stm32_adc, dev);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    stm32_adc *s = STM32_ADC(obj);
 
 #if 0
     sysbus_init_irq(dev, &s->irq);
@@ -212,8 +216,6 @@ stm32f2xx_adc_init(SysBusDevice *dev)
 
     memory_region_init_io(&s->iomem, OBJECT(s), &stm32f2xx_adc_ops, s, "adc", 0x400);
     sysbus_init_mmio(dev, &s->iomem);
-
-    return 0;
 }
 
 static Property stm32f2xx_adc_properties[] = {
@@ -226,15 +228,15 @@ stm32f2xx_adc_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(klass);
 
-    sc->init = stm32f2xx_adc_init;
     dc->reset = f2xx_adc_reset;
-    dc->props = stm32f2xx_adc_properties;
+    device_class_set_props(dc, stm32f2xx_adc_properties);
 }
 
 static const TypeInfo stm32f2xx_adc_info = {
-    .name = "stm32f2xx_adc",
+    .name = TYPE_STM32_ADC,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(stm32_adc),
+    .instance_init = stm32f2xx_adc_init,
     .class_init = stm32f2xx_adc_class_init
 };
 

@@ -16,7 +16,6 @@
 #include "hw/sysbus.h"
 #include "migration/vmstate.h"
 #include "qemu/timer.h"
-<<<<<<< HEAD
 #include "hw/intc/armv7m_nvic.h"
 #include "hw/irq.h"
 #include "hw/qdev-properties.h"
@@ -36,57 +35,6 @@
  * and one for the unused exception number 0).
  *
  * NVIC_MAX_IRQ is the highest permitted number of external IRQ lines.
-=======
-#include "hw/arm/arm.h"
-#include "exec/address-spaces.h"
-#include "gic_internal.h"
-#include "sysemu/sysemu.h"
-
-//#define DEBUG_ARMV7M_NVIC
-#ifdef DEBUG_ARMV7M_NVIC
-
-// NOTE: The usleep() helps the MacOS stdout from freezing when we have a lot of print out
-#define DPRINTF(fmt, ...)                                       \
-    do { printf("ARMV7M_NVIC: " fmt , ## __VA_ARGS__); \
-         /* usleep(1000); */ /* the usleep causes watchdogs :( */ \
-    } while (0)
-#else
-#define DPRINTF(fmt, ...)
-#endif
-
-
-typedef struct {
-    GICState gic;
-    struct {
-        uint32_t control;
-        uint32_t reload;
-        int64_t tick;
-        QEMUTimer *timer;
-    } systick;
-    uint16_t aircr_reg;     /* low word of Application Interrupt and Reset Control Register */
-    MemoryRegion sysregmem;
-    MemoryRegion gic_iomem_alias;
-    MemoryRegion container;
-    uint32_t num_irq;
-    qemu_irq sysresetreq;
-    uint32_t scr_reg;      /* contents of SCR register */
-    /* set true if we executed a WFI instruction with the SLEEPDEEP bit set in the SCR */
-    bool in_deep_sleep;
-    // Set true if we execute a WFI instruction with both SLEEPDEEP bit set in the SCR
-    // and PDDS (Power Down Deep Sleep) bit is set in the PWR_CR register
-    bool in_standby;
-    // Properties
-    void *stm32_pwr_prop;
-    // output IRQs
-    qemu_irq cpu_wakeup_out;
-    qemu_irq power_out;
-} nvic_state;
-
-#define TYPE_NVIC "armv7m_nvic"
-/**
- * NVICClass:
- * @parent_reset: the parent class' reset handler.
->>>>>>> 919b29ba7d... Pebble Qemu
  *
  * NVIC_MAX_VECTORS is the highest permitted number of exceptions.
  *
@@ -116,7 +64,6 @@ static const uint8_t nvic_id[] = {
     0x00, 0xb0, 0x1b, 0x00, 0x0d, 0xe0, 0x05, 0xb1
 };
 
-<<<<<<< HEAD
 static int nvic_pending_prio(NVICState *s)
 {
     /* return the group priority of the current pending interrupt,
@@ -196,13 +143,6 @@ static bool exc_is_banked(int exc)
         exc == ARMV7M_EXCP_PENDSV ||
         exc == ARMV7M_EXCP_SYSTICK;
 }
-=======
-/* SCR register definitions */
-#define SCR_REG_SLEEPDEEP   0x00000004
-
-/* qemu timers run at 1GHz.   We want something closer to 1MHz.  */
-#define SYSTICK_SCALE 1000ULL
->>>>>>> 919b29ba7d... Pebble Qemu
 
 /* Return a mask word which clears the subpriority bits from
  * a priority value for an M-profile exception, leaving only
@@ -438,7 +378,6 @@ static inline int nvic_exec_prio(NVICState *s)
 
 bool armv7m_nvic_neg_prio_requested(void *opaque, bool secure)
 {
-<<<<<<< HEAD
     /* Return true if the requested execution priority is negative
      * for the specified security state, ie that security state
      * has an active NMI or HardFault or has set its FAULTMASK.
@@ -451,18 +390,6 @@ bool armv7m_nvic_neg_prio_requested(void *opaque, bool secure)
 
     if (s->cpu->env.v7m.faultmask[secure]) {
         return true;
-=======
-    nvic_state *s = (nvic_state *)opaque;
-    s->systick.control |= SYSTICK_COUNTFLAG;
-    if (s->systick.control & SYSTICK_TICKINT) {
-        if (!s->in_deep_sleep) {
-            /* NOTE: In deep sleep mode, all peripherals are off (no clocks), so
-             * no IRQs should be made pending. Eventually, we should gate all
-             * peripherals according to deep sleep mode, but SysTick is a good
-             * important start. */
-            armv7m_nvic_set_pending(s, ARMV7M_EXCP_SYSTICK);
-        }
->>>>>>> 919b29ba7d... Pebble Qemu
     }
 
     if (secure ? s->sec_vectors[ARMV7M_EXCP_HARD].active :
@@ -995,34 +922,8 @@ bool armv7m_nvic_get_ready_status(void *opaque, int irq, bool secure)
 
     vec = (banked && secure) ? &s->sec_vectors[irq] : &s->vectors[irq];
 
-<<<<<<< HEAD
     return vec->enabled &&
         exc_group_prio(s, vec->prio, secure) < running;
-=======
-/* Set the base priority */
-void armv7m_nvic_set_base_priority(void *opaque, unsigned int priority)
-{
-    nvic_state *s = (nvic_state *)opaque;
-    if (priority == 0) {
-        s->gic.priority_mask[0] = 0x100;
-    } else {
-        /* Pay only attention to the priority group when masking interrupts */
-        uint32_t group_setting = (s->aircr_reg >> 8) & 0x03;
-        uint32_t group_mask = (0x0FF << (group_setting + 1)) & 0x0FF;
-        s->gic.priority_mask[0] = priority & group_mask;    /* TODO: Make this more general */
-    }
-    gic_update(&s->gic);
-}
-
-/* The external routines use the hardware vector numbering, ie. the first
-   IRQ is #16.  The internal GIC routines use #32 as the first IRQ.  */
-void armv7m_nvic_set_pending(void *opaque, int irq)
-{
-    nvic_state *s = (nvic_state *)opaque;
-    if (irq >= 16)
-        irq += 16;
-    gic_set_pending_private(&s->gic, 0, irq);
->>>>>>> 919b29ba7d... Pebble Qemu
 }
 
 /* callback when external interrupt line is changed */
@@ -1037,7 +938,6 @@ static void set_irq_level(void *opaque, int n, int level)
 
     trace_nvic_set_irq_level(n, level);
 
-<<<<<<< HEAD
     /* The pending status of an external interrupt is
      * latched on rising edge and exception handler return.
      *
@@ -1052,28 +952,6 @@ static void set_irq_level(void *opaque, int n, int level)
             armv7m_nvic_set_pending(s, n, false);
         }
     }
-=======
-    /* We can't be in deep sleep mode anymore because we received an interrupt
-     * Actually, the correct way to do this to match the hardware exactly would be to fall
-     * out of deep sleep even if an interrupt is pending - regardless if it is active or
-     * not or masked due to BASEPRI. This would involved moving this reset of deep sleep
-     * mode higher up the call chain, perhaps in arm_gic.c, where we get notification of
-     * interrupts that change to pending state.  */
-    s->in_deep_sleep = false;
-    if (s->in_standby) {
-        qemu_set_irq(s->power_out, true);
-        s->in_standby = false;
-    }
-
-    irq = gic_acknowledge_irq(&s->gic, 0, MEMTXATTRS_UNSPECIFIED);
-    if (irq == 1023) {
-        hw_error("Interrupt but no vector\n");
-    }
-    if (irq >= 32) {
-        irq -= 16;
-    }
-    return irq;
->>>>>>> 919b29ba7d... Pebble Qemu
 }
 
 /* callback when external NMI line is changed */
@@ -1094,46 +972,7 @@ static void nvic_nmi_trigger(void *opaque, int n, int level)
     }
 }
 
-<<<<<<< HEAD
 static uint32_t nvic_readl(NVICState *s, uint32_t offset, MemTxAttrs attrs)
-=======
-void armv7m_nvic_cpu_executed_wfi(void *opaque)
-{
-    nvic_state *s = (nvic_state *)opaque;
-    if ((s->scr_reg & SCR_REG_SLEEPDEEP) != 0) {
-        s->in_deep_sleep = true;
-        if (s->stm32_pwr_prop && f2xx_pwr_powerdown_deepsleep(s->stm32_pwr_prop)) {
-            s->in_standby = true;
-            // For now, this is an easy way to disable nearly all interrupts from waking up
-            // the CPU. Technically, this is not correct and we should allow specific ones
-            // through (some RTC interrupts, etc.).
-            armv7m_nvic_set_base_priority(opaque, 0x01);
-
-            // Inform peripherals that the power is off
-            qemu_set_irq(s->power_out, false);
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Called when the WKUP pin changes state (GPIO A0)
-static void nvic_wakeup_in_cb(void *opaque, int n, int level)
-{
-    nvic_state *s = (nvic_state *)opaque;
-
-    // If we are in standby mode, wake up the CPU
-    if (level && s->in_standby) {
-        s->in_standby = false;
-        s->in_deep_sleep = false;
-        qemu_set_irq(s->power_out, true);
-        qemu_set_irq(s->cpu_wakeup_out, level);
-    } else if (!level) {
-        qemu_set_irq(s->cpu_wakeup_out, level);
-    }
-}
-
-static uint32_t nvic_readl(nvic_state *s, uint32_t offset)
->>>>>>> 919b29ba7d... Pebble Qemu
 {
     ARMCPU *cpu = s->cpu;
     uint32_t val;
@@ -1214,7 +1053,6 @@ static uint32_t nvic_readl(nvic_state *s, uint32_t offset)
         /* STTNS: RES0 for the Main Extension */
         return val;
     case 0xd08: /* Vector Table Offset.  */
-<<<<<<< HEAD
         return cpu->env.v7m.vecbase[attrs.secure];
     case 0xd0c: /* Application Interrupt/Reset Control (AIRCR) */
         val = 0xfa050000 | (s->prigroup[attrs.secure] << 8);
@@ -1247,19 +1085,6 @@ static uint32_t nvic_readl(nvic_state *s, uint32_t offset)
         if (!arm_feature(&cpu->env, ARM_FEATURE_V7)) {
             goto bad_offset;
         }
-=======
-        cpu = ARM_CPU(current_cpu);
-        return cpu->env.v7m.vecbase;
-    case 0xd0c: /* Application Interrupt/Reset Control.  */
-        return 0xfa050000 | s->aircr_reg;
-    case 0xd10: /* System Control.  */
-        return s->scr_reg;
-        break;
-    case 0xd14: /* Configuration Control.  */
-        cpu = ARM_CPU(current_cpu);
-        return cpu->env.v7m.ccr;
-    case 0xd24: /* System Handler Status.  */
->>>>>>> 919b29ba7d... Pebble Qemu
         val = 0;
         if (attrs.secure) {
             if (s->sec_vectors[ARMV7M_EXCP_MEM].active) {
@@ -1371,7 +1196,6 @@ static uint32_t nvic_readl(nvic_state *s, uint32_t offset)
             val |= (1 << 8);
         }
         return val;
-<<<<<<< HEAD
     case 0xd2c: /* Hard Fault Status.  */
         if (!arm_feature(&cpu->env, ARM_FEATURE_M_MAIN)) {
             goto bad_offset;
@@ -1397,26 +1221,6 @@ static uint32_t nvic_readl(nvic_state *s, uint32_t offset)
         /* TODO: Implement fault status registers.  */
         qemu_log_mask(LOG_UNIMP,
                       "Aux Fault status registers unimplemented\n");
-=======
-    case 0xd28: /* Configurable Fault Status.  */
-        cpu = ARM_CPU(current_cpu);
-        return cpu->env.v7m.cfsr;
-    case 0xd2c: /* Hard Fault Status.  */
-        cpu = ARM_CPU(current_cpu);
-        return cpu->env.v7m.hfsr;
-    case 0xd30: /* Debug Fault Status.  */
-        cpu = ARM_CPU(current_cpu);
-        return cpu->env.v7m.dfsr;
-    case 0xd34: /* MemManage Address.  */
-        cpu = ARM_CPU(current_cpu);
-        return cpu->env.v7m.mmfar;
-    case 0xd38: /* Bus Fault Address.  */
-        cpu = ARM_CPU(current_cpu);
-        return cpu->env.v7m.bfar;
-    case 0xd3c: /* Aux Fault Status.  */
-        /* TODO: Implement fault status registers.  */
-        qemu_log_mask(LOG_UNIMP, "AUX fault status registers unimplemented\n");
->>>>>>> 919b29ba7d... Pebble Qemu
         return 0;
     case 0xd40: /* PFR0.  */
         return cpu->id_pfr0;
@@ -1443,7 +1247,6 @@ static uint32_t nvic_readl(nvic_state *s, uint32_t offset)
     case 0xd6c: /* ISAR3.  */
         return cpu->isar.id_isar3;
     case 0xd70: /* ISAR4.  */
-<<<<<<< HEAD
         return cpu->isar.id_isar4;
     case 0xd74: /* ISAR5.  */
         return cpu->isar.id_isar5;
@@ -1656,42 +1459,6 @@ static uint32_t nvic_readl(nvic_state *s, uint32_t offset)
         return cpu->isar.mvfr1;
     case 0xf48: /* MVFR2 */
         return cpu->isar.mvfr2;
-=======
-        return 0x01310102;
-    case 0xd90: /* MPU type register.  */
-        cpu = ARM_CPU(current_cpu);
-        return cpu->pmsav7_dregion << 8;
-    case 0xd94: /* MPU control register.  */
-        cpu = ARM_CPU(current_cpu);
-        return cpu->env.v7m.mpu_ctrl;
-    case 0xd98: /* MPU_RNR.  */
-        cpu = ARM_CPU(current_cpu);
-        return cpu->env.cp15.c6_rgnr;
-    case 0xd9c: /* MPU_RBAR: MPU region base address register.  */
-    case 0xda4: /* MPU_RBAR_A1.  */
-    case 0xdac: /* MPU_RBAR_A2.  */
-    case 0xdb4: /* MPU_RBAR_A3.  */
-        cpu = ARM_CPU(current_cpu);
-        if (cpu->pmsav7_dregion == 0) {
-            return 0;
-        }
-        val = cpu->env.pmsav7.drbar[cpu->env.cp15.c6_rgnr];
-        val |= (cpu->env.cp15.c6_rgnr ) & 0xf;
-        return val;
-    case 0xda0: /* MPU_RASR: MPU region attribute and size register.  */
-    case 0xda8: /* MPU_RASR_A1.  */
-    case 0xdb0: /* MPU_RASR_A2.  */
-    case 0xdb8: /* MPU_RASR_A3.  */
-        cpu = ARM_CPU(current_cpu);
-        if (cpu->pmsav7_dregion == 0) {
-            return 0;
-        }
-        val = cpu->env.pmsav7.dracr[cpu->env.cp15.c6_rgnr];
-        val <<= 16;
-        val |= cpu->env.pmsav7.drsr[cpu->env.cp15.c6_rgnr];
-        return val;
-        /* TODO: Implement debug registers.  */
->>>>>>> 919b29ba7d... Pebble Qemu
     default:
     bad_offset:
         qemu_log_mask(LOG_GUEST_ERROR, "NVIC: Bad read offset 0x%x\n", offset);
@@ -2118,7 +1885,6 @@ static void nvic_writel(NVICState *s, uint32_t offset, uint32_t value,
             cpu->env.sau.rnr = value;
         }
         break;
-<<<<<<< HEAD
     case 0xddc: /* SAU_RBAR */
     {
         int region = cpu->env.sau.rnr;
@@ -2128,24 +1894,6 @@ static void nvic_writel(NVICState *s, uint32_t offset, uint32_t value,
         }
         if (!attrs.secure) {
             return;
-=======
-    case 0xd08: /* Vector Table Offset.  */
-        cpu = ARM_CPU(current_cpu);
-        cpu->env.v7m.vecbase = value & 0xffffff80;
-        break;
-    case 0xd0c: /* Application Interrupt/Reset Control.  */
-        if ((value >> 16) == 0x05fa) {
-            if (value & 4) {
-                qemu_irq_pulse(s->sysresetreq);
-            }
-            if (value & 2) {
-                qemu_log_mask(LOG_UNIMP, "VECTCLRACTIVE unimplemented\n");
-            }
-            if (value & 1) {
-                qemu_system_reset_request();
-            }
-            s->aircr_reg = value & 0x00700;    /* keep only the bits we suport */
->>>>>>> 919b29ba7d... Pebble Qemu
         }
         if (region >= cpu->sau_sregion) {
             return;
@@ -2153,7 +1901,6 @@ static void nvic_writel(NVICState *s, uint32_t offset, uint32_t value,
         cpu->env.sau.rbar[region] = value & ~0x1f;
         tlb_flush(CPU(cpu));
         break;
-<<<<<<< HEAD
     }
     case 0xde0: /* SAU_RLAR */
     {
@@ -2170,14 +1917,6 @@ static void nvic_writel(NVICState *s, uint32_t offset, uint32_t value,
         }
         cpu->env.sau.rlar[region] = value & ~0x1c;
         tlb_flush(CPU(cpu));
-=======
-    case 0xd10: /* System Control.  */
-        s->scr_reg = value;
-        break;
-    case 0xd14: /* Configuration Control.  */
-        cpu = ARM_CPU(current_cpu);
-        cpu->env.v7m.ccr = value & CCR_STKALIGN;
->>>>>>> 919b29ba7d... Pebble Qemu
         break;
     }
     case 0xde4: /* SFSR */
@@ -2189,7 +1928,6 @@ static void nvic_writel(NVICState *s, uint32_t offset, uint32_t value,
         }
         cpu->env.v7m.sfsr &= ~value; /* W1C */
         break;
-<<<<<<< HEAD
     case 0xde8: /* SFAR */
         if (!arm_feature(&cpu->env, ARM_FEATURE_V8)) {
             goto bad_offset;
@@ -2198,104 +1936,6 @@ static void nvic_writel(NVICState *s, uint32_t offset, uint32_t value,
             return;
         }
         cpu->env.v7m.sfsr = value;
-=======
-    case 0xd28: /* Configurable Fault Status.  */
-        cpu = ARM_CPU(current_cpu);
-        cpu->env.v7m.cfsr &= ~value;
-        DPRINTF("writel:cfsr now: %08X\n", cpu->env.v7m.cfsr);
-        break;
-    case 0xd2c: /* Hard Fault Status.  */
-        cpu = ARM_CPU(current_cpu);
-        cpu->env.v7m.hfsr &= ~value;
-        DPRINTF("writel:hfsr now: %08X\n", cpu->env.v7m.hfsr);
-        break;
-    case 0xd30: /* Debug Fault Status.  */
-        cpu = ARM_CPU(current_cpu);
-        cpu->env.v7m.dfsr &= ~value;
-        DPRINTF("writel:dfsr now: %08X\n", cpu->env.v7m.dfsr);
-        break;
-    case 0xd34: /* Mem Manage Address.  */
-        cpu = ARM_CPU(current_cpu);
-        cpu->env.v7m.mmfar = value;
-        DPRINTF("writel:mmfar now: %08X\n", cpu->env.v7m.mmfar);
-        break;
-    case 0xd38: /* Bus Fault Address.  */
-        cpu = ARM_CPU(current_cpu);
-        cpu->env.v7m.bfar = value;
-        DPRINTF("writel:bfar now: %08X\n", cpu->env.v7m.bfar);
-        break;
-    case 0xd3c: /* Aux Fault Status.  */
-        qemu_log_mask(LOG_UNIMP,
-                      "NVIC: AUX fault status registers unimplemented\n");
-        break;
-    case 0xd94: /* MPU control register.  */
-        cpu = ARM_CPU(current_cpu);
-        if (cpu->pmsav7_dregion == 0) {
-            DPRINTF("writel:mpu_ctrl -- no regions!\n");
-            break;
-        }
-        cpu->env.v7m.mpu_ctrl = value & 0x7;
-        if (cpu->env.v7m.mpu_ctrl & MPU_CTRL_ENABLE) {
-            cpu->env.cp15.sctlr_ns |= SCTLR_M;
-        } else {
-            cpu->env.cp15.sctlr_ns &= ~SCTLR_M;
-        }
-        /* TODO: mimic MPU_CTRL_HFNMIENA */
-        if (cpu->env.v7m.mpu_ctrl & MPU_CTRL_PRIVDEFENA) {
-            cpu->env.cp15.sctlr_ns |= SCTLR_BR;
-        } else {
-            cpu->env.cp15.sctlr_ns &= ~SCTLR_BR;
-        }
-        /* This may enable/disable the MMU, so do a TLB flush.  */
-        DPRINTF("writel:mpu_ctrl now: %08X\n", cpu->env.v7m.mpu_ctrl);
-        DPRINTF("writel:sctlr_ns now: %016llX\n", cpu->env.cp15.sctlr_ns);
-        tlb_flush(CPU(cpu), 1);
-        break;
-    case 0xd98: /* MPU_RNR.  */
-        cpu = ARM_CPU(current_cpu);
-        value &= 0xff;
-        if (value < cpu->pmsav7_dregion) {
-            cpu->env.cp15.c6_rgnr = value;
-        }
-        DPRINTF("writel:mpu_rnr, region now: %u\n", cpu->env.cp15.c6_rgnr);
-        break;
-    case 0xd9c: /* MPU_RBAR: MPU region base address register.  */
-    case 0xda4: /* MPU_RBAR_A1.  */
-    case 0xdac: /* MPU_RBAR_A2.  */
-    case 0xdb4: /* MPU_RBAR_A3.  */
-        cpu = ARM_CPU(current_cpu);
-        if (cpu->pmsav7_dregion == 0) {
-            DPRINTF("writel:mpu_rbar (%02X) -- no regions!\n", offset);
-            break;
-        }
-        if (value & 0x10) {
-            /* region update */
-            uint32_t region = value & 0x0f;
-            if (region < cpu->pmsav7_dregion) {
-                cpu->env.cp15.c6_rgnr = region;
-            }
-            DPRINTF("writel:mpu_rbar (%04X), region now: %u\n", offset, cpu->env.cp15.c6_rgnr);
-        }
-        value &= ~0x1f;
-        cpu->env.pmsav7.drbar[cpu->env.cp15.c6_rgnr] = value;
-        DPRINTF("writel:mpu_rbar (%04X), region(%u) now %08X\n", offset, cpu->env.cp15.c6_rgnr, cpu->env.pmsav7.drbar[cpu->env.cp15.c6_rgnr]);
-        tlb_flush(CPU(cpu), 1); /* Mappings may have changed - purge! */
-        break;
-    case 0xda0: /* MPU_RSAR: MPU region attribute and size register.  */
-    case 0xda8: /* MPU_RSAR_A1.  */
-    case 0xdb0: /* MPU_RSAR_A2.  */
-    case 0xdb8: /* MPU_RSAR_A3.  */
-        cpu = ARM_CPU(current_cpu);
-        if (cpu->pmsav7_dregion == 0) {
-            DPRINTF("writel:mpu_rsar (%02X) -- no regions!\n", offset);
-            break;
-        }
-        cpu->env.pmsav7.dracr[cpu->env.cp15.c6_rgnr] = value >> 16;
-        cpu->env.pmsav7.drsr[cpu->env.cp15.c6_rgnr] = value & 0xffff;
-        DPRINTF("writel:mpu_rsar (%04X), region(%u), dracr now %04X\n", offset, cpu->env.cp15.c6_rgnr, cpu->env.pmsav7.dracr[cpu->env.cp15.c6_rgnr]);
-        DPRINTF("writel:mpu_rsar (%04X), region(%u), drsr now %04X\n", offset, cpu->env.cp15.c6_rgnr, cpu->env.pmsav7.drsr[cpu->env.cp15.c6_rgnr]);
-        tlb_flush(CPU(cpu), 1); /* Mappings may have changed - purge! */
->>>>>>> 919b29ba7d... Pebble Qemu
         break;
     case 0xf00: /* Software Triggered Interrupt Register */
     {
@@ -2459,7 +2099,6 @@ static MemTxResult nvic_sysreg_read(void *opaque, hwaddr addr,
     uint32_t offset = addr;
     unsigned i, startvec, end;
     uint32_t val;
-    ARMCPU *cpu;
 
     if (attrs.user && !nvic_user_access_ok(s, addr, attrs)) {
         /* Generate BusFault for unprivileged accesses */
@@ -2538,7 +2177,6 @@ static MemTxResult nvic_sysreg_read(void *opaque, hwaddr addr,
             }
             val = deposit32(val, i * 8, 8, get_prio(s, hdlidx, sbank));
         }
-<<<<<<< HEAD
         break;
     case 0xd28 ... 0xd2b: /* Configurable Fault Status (CFSR) */
         if (!arm_feature(&s->cpu->env, ARM_FEATURE_M_MAIN)) {
@@ -2558,25 +2196,6 @@ static MemTxResult nvic_sysreg_read(void *opaque, hwaddr addr,
             val |= s->cpu->env.v7m.cfsr[M_REG_NS] & R_V7M_CFSR_BFSR_MASK;
         }
         val = extract32(val, (offset - 0xd28) * 8, size * 8);
-=======
-        return val;
-    case 0xd28 ... 0xd2b: /* Configurable Fault Status.  */
-        cpu = ARM_CPU(current_cpu);
-        return extract32(cpu->env.v7m.cfsr, (offset - 0xd28) * 8, size * 8);
-    case 0xda0 ... 0xdb7: /* MPU_RSAR and aliases.  */
-        cpu = ARM_CPU(current_cpu);
-        if (cpu->pmsav7_dregion == 0) {
-            break;
-        }
-        if ((size == 2) && (offset & 7) == 0) {
-            val = cpu->env.pmsav7.drsr[cpu->env.cp15.c6_rgnr];
-            return val & 0xffff;
-        }
-        if ((size == 2) && (offset & 7) == 2) {
-            val = cpu->env.pmsav7.dracr[cpu->env.cp15.c6_rgnr];
-            return val & 0xffff;
-        }
->>>>>>> 919b29ba7d... Pebble Qemu
         break;
     case 0xfe0 ... 0xfff: /* ID.  */
         if (offset & 3) {
@@ -2607,7 +2226,6 @@ static MemTxResult nvic_sysreg_write(void *opaque, hwaddr addr,
 {
     NVICState *s = (NVICState *)opaque;
     uint32_t offset = addr;
-<<<<<<< HEAD
     unsigned i, startvec, end;
     unsigned setval = 0;
 
@@ -2617,10 +2235,6 @@ static MemTxResult nvic_sysreg_write(void *opaque, hwaddr addr,
         /* Generate BusFault for unprivileged accesses */
         return MEMTX_ERROR;
     }
-=======
-    int i;
-    ARMCPU *cpu;
->>>>>>> 919b29ba7d... Pebble Qemu
 
     switch (offset) {
     case 0x100 ... 0x13f: /* NVIC Set enable */
@@ -2684,7 +2298,6 @@ static MemTxResult nvic_sysreg_write(void *opaque, hwaddr addr,
             }
             set_prio(s, hdlidx, sbank, newprio);
         }
-<<<<<<< HEAD
         nvic_irq_update(s);
         goto exit_ok;
     case 0xd28 ... 0xd2b: /* Configurable Fault Status (CFSR) */
@@ -2710,43 +2323,6 @@ static MemTxResult nvic_sysreg_write(void *opaque, hwaddr addr,
             s->cpu->env.v7m.cfsr[M_REG_NS] &= ~(value & R_V7M_CFSR_BFSR_MASK);
         }
         goto exit_ok;
-=======
-        gic_update(&s->gic);
-        return;
-    case 0xd28 ... 0xd2b: /* Configurable Fault Status.  */
-        if (size == 1) {
-            value <<= (offset - 0xd28) * 8;
-            offset &= ~3;
-            size = 4;
-            break;
-        }
-        if ((size == 2) && ((offset & 1) == 0)) {
-            value <<= (offset - 0xd28) * 8;
-            offset &= ~3;
-            size = 4;
-            break;
-        }
-        break;
-    case 0xda0 ... 0xdb7: /* MPU_RSAR and aliases.  */
-        cpu = ARM_CPU(current_cpu);
-        if (cpu->pmsav7_dregion == 0) {
-            break;
-        }
-        if ((size == 2) && (offset & 7) == 0) {
-            value |= cpu->env.pmsav7.dracr[cpu->env.cp15.c6_rgnr] << 16;
-            offset &= ~2;
-            size = 4;
-            break;
-        }
-        if ((size == 2) && (offset & 7) == 2) {
-            value <<= 16;
-            value |= cpu->env.pmsav7.drsr[cpu->env.cp15.c6_rgnr];
-            offset &= ~2;
-            size = 4;
-            break;
-        }
-        break;
->>>>>>> 919b29ba7d... Pebble Qemu
     }
     if (size == 4) {
         nvic_writel(s, offset, value, attrs);
@@ -3022,7 +2598,6 @@ static void armv7m_nvic_reset(DeviceState *dev)
      * We updated state that affects the CPU's MMUidx and thus its hflags;
      * and we can't guarantee that we run before the CPU reset function.
      */
-<<<<<<< HEAD
     arm_rebuild_hflags(&s->cpu->env);
 }
 
@@ -3039,18 +2614,6 @@ static void nvic_systick_trigger(void *opaque, int n, int level)
          */
         armv7m_nvic_set_pending(s, ARMV7M_EXCP_SYSTICK, n);
     }
-=======
-    s->gic.cpu_ctlr[0] = GICC_CTLR_EN_GRP0;
-    s->gic.priority_mask[0] = 0x100;
-    /* The NVIC as a whole is always enabled. */
-    s->gic.ctlr = 1;
-    systick_reset(s);
-
-    s->scr_reg = 0;
-    s->in_deep_sleep = false;
-    s->in_standby = false;
-    qemu_set_irq(s->power_out, true);
->>>>>>> 919b29ba7d... Pebble Qemu
 }
 
 static void armv7m_nvic_realize(DeviceState *dev, Error **errp)
@@ -3139,7 +2702,6 @@ static void armv7m_nvic_realize(DeviceState *dev, Error **errp)
     memory_region_init_io(&s->sysregmem, OBJECT(s), &nvic_sysreg_ops, s,
                           "nvic_sysregs", 0x1000);
     memory_region_add_subregion(&s->container, 0, &s->sysregmem);
-<<<<<<< HEAD
 
     memory_region_init_io(&s->systickmem, OBJECT(s),
                           &nvic_systick_ops, s,
@@ -3161,30 +2723,6 @@ static void armv7m_nvic_realize(DeviceState *dev, Error **errp)
     }
 
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->container);
-=======
-    /* Alias the GIC region so we can get only the section of it
-     * we need, and layer it on top of the system register region.
-     */
-    memory_region_init_alias(&s->gic_iomem_alias, OBJECT(s),
-                             "nvic-gic", &s->gic.iomem,
-                             0x100, 0xc00);
-    memory_region_add_subregion_overlap(&s->container, 0x100,
-                                        &s->gic_iomem_alias, 1);
-    /* Map the whole thing into system memory at the location required
-     * by the v7M architecture.
-     */
-    memory_region_add_subregion(get_system_memory(), 0xe000e000, &s->container);
-    s->systick.timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, systick_timer_tick, s);
-
-    // Create the input handler to be notified when the WKUP pin gets asserted
-    qdev_init_gpio_in_named(dev, nvic_wakeup_in_cb, "wakeup_in", 1);
-
-    // This is the handler that will wakeup the CPU
-    qdev_init_gpio_out_named(dev, &s->cpu_wakeup_out, "wakeup_out", 1);
-
-    // This is the handler that informs peripherals that the power is on/off
-    qdev_init_gpio_out_named(dev, &s->power_out, "power_out", 1);
->>>>>>> 919b29ba7d... Pebble Qemu
 }
 
 static void armv7m_nvic_instance_init(Object *obj)
@@ -3212,11 +2750,6 @@ static void armv7m_nvic_instance_init(Object *obj)
     qdev_init_gpio_in_named(dev, nvic_nmi_trigger, "NMI", 1);
 }
 
-static Property armv7m_nvic_properties[] = {
-    DEFINE_PROP_PTR("stm32_pwr", nvic_state, stm32_pwr_prop),
-    DEFINE_PROP_END_OF_LIST(),
-};
-
 static void armv7m_nvic_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -3225,7 +2758,6 @@ static void armv7m_nvic_class_init(ObjectClass *klass, void *data)
     device_class_set_props(dc, props_nvic);
     dc->reset = armv7m_nvic_reset;
     dc->realize = armv7m_nvic_realize;
-    dc->props = armv7m_nvic_properties;
 }
 
 static const TypeInfo armv7m_nvic_info = {

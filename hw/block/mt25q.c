@@ -3,10 +3,15 @@
  * Modelled after the m25p80 emulation found in hw/block/m25p80.c
  */
 
+#include "qemu/osdep.h"
+#include "qemu/log.h"
+#include "qapi/error.h"
 #include "hw/hw.h"
 #include "sysemu/block-backend.h"
 #include "sysemu/blockdev.h"
-#include "hw/ssi.h"
+#include "hw/qdev-properties.h"
+#include "hw/ssi/ssi.h"
+#include "migration/vmstate.h"
 
 
 // TODO: These should be made configurable to support different flash parts
@@ -141,8 +146,8 @@ static void mt25q_flash_sync_page(Flash *s, int page)
     qemu_iovec_init(&iov, 1);
     qemu_iovec_add(&iov, s->storage + blk_sector * BDRV_SECTOR_SIZE,
                    nb_sectors * BDRV_SECTOR_SIZE);
-    blk_aio_writev(s->blk, blk_sector, &iov, nb_sectors, blk_sync_complete,
-                   NULL);
+    blk_aio_pwritev(s->blk, page * s->page_size, &iov, 0,
+                    blk_sync_complete, NULL);
 }
 
 static inline void mt25q_flash_sync_area(Flash *s, int64_t off, int64_t len)
@@ -161,7 +166,7 @@ static inline void mt25q_flash_sync_area(Flash *s, int64_t off, int64_t len)
     qemu_iovec_init(&iov, 1);
     qemu_iovec_add(&iov, s->storage + (start * BDRV_SECTOR_SIZE),
                                         nb_sectors * BDRV_SECTOR_SIZE);
-    blk_aio_writev(s->blk, start, &iov, nb_sectors, blk_sync_complete, NULL);
+    blk_aio_pwritev(s->blk, off, &iov, 0, blk_sync_complete, NULL);
 }
 
 static inline void flash_sync_dirty(Flash *s, int64_t newpage)
@@ -412,7 +417,7 @@ static uint32_t mt25q_transfer8(SSISlave *ss, uint32_t tx)
     return r;
 }
 
-static int mt25q_init(SSISlave *ss)
+static void mt25q_realize(SSISlave *ss, Error **errp)
 {
     DriveInfo *dinfo;
     Flash *s = MT25Q(ss);
@@ -423,27 +428,20 @@ static int mt25q_init(SSISlave *ss)
     s->dirty_page = -1;
     s->STATUS_REG = 0;
 
-    /* FIXME use a qdev drive property instead of drive_get() */
-    dinfo = drive_get(IF_PFLASH, 0, 1);   /* Use the 2nd -pflash drive */
-
-    if (dinfo) {
+    if (s->blk) {
         DB_PRINT_L(0, "Binding to IF_MTD drive");
-        s->blk = blk_by_legacy_dinfo(dinfo);
-        blk_attach_dev_nofail(s->blk, s);
-
         s->storage = blk_blockalign(s->blk, s->size);
 
-        int r = blk_read(s->blk, 0, s->storage, DIV_ROUND_UP(s->size, BDRV_SECTOR_SIZE));
-        if (r < 0) {
-            fprintf(stderr, "Failed to initialize SPI flash (%d)!\n", r);
-            return 1;
+
+        if (blk_pread(s->blk, 0, s->storage, s->size) != s->size) {
+            error_setg(errp,  "Failed to initialize SPI flash!");
+            return;
         }
     } else {
         DB_PRINT_L(-1, "No BDRV - binding to RAM");
         s->storage = blk_blockalign(NULL, s->size);
         memset(s->storage, 0xFF, s->size);
     }
-    return 0;
 }
 
 static int mt25q_cs(SSISlave *ss, bool select)
@@ -462,9 +460,11 @@ static int mt25q_cs(SSISlave *ss, bool select)
     return 0;
 }
 
-static void mt25q_pre_save(void *opaque)
+static int mt25q_pre_save(void *opaque)
 {
     flash_sync_dirty((Flash *)opaque, -1);
+
+    return 0;
 }
 
 static const VMStateDescription vmstate_mt25q = {
@@ -477,16 +477,22 @@ static const VMStateDescription vmstate_mt25q = {
     }
 };
 
+static Property mx251_properties[] = {
+    DEFINE_PROP_DRIVE("drive", Flash, blk),
+    DEFINE_PROP_END_OF_LIST(),
+};
+
 static void mt25q_class_init(ObjectClass *class, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(class);
     SSISlaveClass *c = SSI_SLAVE_CLASS(class);
 
-    c->init = mt25q_init;
+    c->realize = mt25q_realize;
     c->transfer = mt25q_transfer8;
     c->set_cs = mt25q_cs;
     c->cs_polarity = SSI_CS_LOW;
     dc->vmsd = &vmstate_mt25q;
+    device_class_set_props(dc, mx251_properties);
 }
 
 static const TypeInfo mt25q_info = {

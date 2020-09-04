@@ -1,6 +1,3 @@
-#include <stdint.h>
-#include <stdbool.h>
-#include <qemu/typedefs.h>
 #include "stm32f2xx.h"
 #include "stm32f4xx.h"
 #include "stm32f7xx.h"

@@ -19,7 +19,10 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "stm32f2xx.h"
+#include "hw/hw.h"
+#include "hw/qdev-properties.h"
 
 
 
@@ -216,7 +219,7 @@ static const MemoryRegionOps stm32_syscfg_ops = {
 
 static void stm32_syscfg_reset(DeviceState *dev)
 {
-    Stm32Syscfg *s = FROM_SYSBUS(Stm32Syscfg, SYS_BUS_DEVICE(dev));
+    Stm32Syscfg *s = STM32F2XX_SYSCFG(dev);
 
     stm32_syscfg_SYSCFG_MEMRMP_write(s, 0x00000000, true);
     stm32_syscfg_SYSCFG_EXTICR_write(s, 0, 0x00000000, true);
@@ -229,9 +232,10 @@ static void stm32_syscfg_reset(DeviceState *dev)
 
 /* DEVICE INITIALIZATION */
 
-static int stm32_syscfg_init(SysBusDevice *dev)
+static void stm32_syscfg_realize(DeviceState *obj, Error **pError)
 {
-    Stm32Syscfg *s = FROM_SYSBUS(Stm32Syscfg, dev);
+    Stm32Syscfg *s = STM32F2XX_SYSCFG(obj);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
 
     s->stm32_rcc = (Stm32Rcc *)s->stm32_rcc_prop;
     s->stm32_exti = (Stm32Exti *)s->stm32_exti_prop;
@@ -239,8 +243,6 @@ static int stm32_syscfg_init(SysBusDevice *dev)
     memory_region_init_io(&s->iomem, OBJECT(s), &stm32_syscfg_ops, s,
                           "syscfg", 0x03ff);
     sysbus_init_mmio(dev, &s->iomem);
-
-    return 0;
 }
 
 static Property stm32_syscfg_properties[] = {
@@ -254,15 +256,14 @@ static Property stm32_syscfg_properties[] = {
 static void stm32_syscfg_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32_syscfg_init;
+    dc->realize = stm32_syscfg_realize;
     dc->reset = stm32_syscfg_reset;
-    dc->props = stm32_syscfg_properties;
+    device_class_set_props(dc,  stm32_syscfg_properties);
 }
 
 static TypeInfo stm32_syscfg_info = {
-    .name  = "stm32f2xx_syscfg",
+    .name  = TYPE_STM32F2XX_SYSCFG,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size  = sizeof(Stm32Syscfg),
     .class_init = stm32_syscfg_class_init
@@ -274,3 +275,4 @@ static void stm32_syscfg_register_types(void)
 }
 
 type_init(stm32_syscfg_register_types)
+

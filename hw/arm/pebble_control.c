@@ -20,11 +20,13 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/arm/stm32.h"
-#include "sysemu/char.h"
+#include "chardev/char.h"
 #include "qemu/timer.h"
 #include "qemu/sockets.h"
+#include "qemu/log.h"
 
 #include "pebble_control.h"
 #include "pebble.h"
@@ -156,7 +158,7 @@ struct PebbleControl {
     // The qemu_chr driver that connects to the host over a socket connection. We receive
     // data from this device, interpret it, and either process it directly in here or forward
     // it onto the uart in the emulated pebble.
-    CharDriverState *chr;
+    Chardev *chr;
 
     // The uart used by the emulated Pebble. We send data to it using its IOHandler
     // callbacks. Data written to the UART by the emulated Pebble gets passed onto us
@@ -493,7 +495,7 @@ void pebble_control_send_vibe_notification(PebbleControl *s, bool on)
 }
 
 // -----------------------------------------------------------------------------------
-PebbleControl *pebble_control_create(CharDriverState *chr, Stm32Uart *uart)
+PebbleControl *pebble_control_create(Chardev *chr, Stm32Uart *uart)
 {
     PebbleControl *s = malloc(sizeof(PebbleControl));
     memset(s, 0, sizeof(*s));
@@ -514,19 +516,22 @@ PebbleControl *pebble_control_create(CharDriverState *chr, Stm32Uart *uart)
         stm32_uart_get_rcv_handlers(uart, &s->uart_chr_can_read, &s->uart_chr_read, &s->uart_chr_event);
 
         // Install our own receive handlers into the CharDriver
-        qemu_chr_add_handlers(
-                        chr,
+        qemu_chr_fe_set_handlers(
+                        &chr,
                         pebble_control_can_receive,
                         pebble_control_receive,
                         pebble_control_event,
-                        (void *)s);
+                        NULL,
+                        (void *)s,
+                        NULL,
+                        true);
     }
 
     return s;
 }
 
 // -----------------------------------------------------------------------------------
-PebbleControl *pebble_control_create_stm32f7xx(CharDriverState *chr, Stm32F7xxUart *uart)
+PebbleControl *pebble_control_create_stm32f7xx(Chardev *chr, Stm32F7xxUart *uart)
 {
     PebbleControl *s = malloc(sizeof(PebbleControl));
     memset(s, 0, sizeof(*s));
@@ -547,12 +552,15 @@ PebbleControl *pebble_control_create_stm32f7xx(CharDriverState *chr, Stm32F7xxUa
         stm32f7xx_uart_get_rcv_handlers(uart, &s->uart_chr_can_read, &s->uart_chr_read, &s->uart_chr_event);
 
         // Install our own receive handlers into the CharDriver
-        qemu_chr_add_handlers(
-                        chr,
+        qemu_chr_fe_set_handlers(
+                        &chr,
                         pebble_control_can_receive,
                         pebble_control_receive,
                         pebble_control_event,
-                        (void *)s);
+                        NULL,
+                        (void *)s,
+                        NULL,
+                        true);
     }
 
     return s;

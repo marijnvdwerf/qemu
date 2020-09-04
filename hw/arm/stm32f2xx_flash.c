@@ -20,13 +20,16 @@
  * SOFTWARE.
  */
 
+#include "qemu/osdep.h"
 #include "sysemu/blockdev.h"
 #include "hw/hw.h"
 #include "hw/block/flash.h"
 #include "block/block.h"
 #include "sysemu/block-backend.h"
 #include "hw/sysbus.h"
-
+#include "hw/arm/stm32.h"
+#include "hw/qdev-properties.h"
+#include "migration/cpu.h"
 
 struct f2xx_flash {
     SysBusDevice busdev;
@@ -42,10 +45,10 @@ struct f2xx_flash {
 f2xx_flash_t *f2xx_flash_register(BlockBackend *blk, hwaddr base,
                                   hwaddr size)
 {
-    DeviceState *dev = qdev_create(NULL, "f2xx.flash");
+    DeviceState *dev = qdev_create(NULL, TYPE_STM32F2XX_FLASH);
     //SysBusDevice *busdev = SYS_BUS_DEVICE(dev);
-    f2xx_flash_t *flash = (f2xx_flash_t *)object_dynamic_cast(OBJECT(dev),
-                                                              "f2xx.flash");
+    f2xx_flash_t *flash = STM32F2XX_FLASH(dev);
+
     qdev_prop_set_uint32(dev, "size", size);
     qdev_prop_set_uint64(dev, "base_address", base);
     if (blk) {
@@ -85,16 +88,17 @@ static const MemoryRegionOps f2xx_flash_ops = {
 
 MemoryRegion *get_system_memory(void); /* XXX */
 
-static int f2xx_flash_init(SysBusDevice *dev)
+static void f2xx_flash_init(DeviceState *obj, Error **pError)
 {
     Error *err = NULL;
-    f2xx_flash_t *flash = FROM_SYSBUS(typeof(*flash), dev);
+    f2xx_flash_t *flash = STM32F2XX_FLASH(obj);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
 
 //    memory_region_init_rom_device(&flash->mem, &f2xx_flash_ops, flash, "name",
 //      size);
-    memory_region_init_ram(&flash->mem, NULL, "f2xx.flash", flash->size, &err);
+    memory_region_init_ram(&flash->mem, OBJECT(flash), "f2xx.flash", flash->size, &err);
 
-    vmstate_register_ram(&flash->mem, DEVICE(flash));
+//    vmstate_register_ram(&flash->mem, DEVICE(flash));
     //vmstate_register_ram_global(&flash->mem);
     memory_region_set_readonly(&flash->mem, true);
     memory_region_add_subregion(get_system_memory(), flash->base_address, &flash->mem);
@@ -104,15 +108,13 @@ static int f2xx_flash_init(SysBusDevice *dev)
     memset(flash->data, 0xff, flash->size);
     if (flash->blk) {
         int r;
-        r = blk_read(flash->blk, 0, flash->data, blk_getlength(flash->blk)/BDRV_SECTOR_SIZE);
+        r = blk_pread(flash->blk, 0, flash->data, blk_getlength(flash->blk));
         if (r < 0) {
             vmstate_unregister_ram(&flash->mem, DEVICE(flash));
             // memory_region_destroy(&flash->mem);
-            return 1;
+//            return 1;
         }
     }
-
-    return 0;
 }
 
 static Property f2xx_flash_properties[] = {
@@ -125,14 +127,13 @@ static Property f2xx_flash_properties[] = {
 static void f2xx_flash_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = f2xx_flash_init;
-    dc->props = f2xx_flash_properties;
+    dc->realize = f2xx_flash_init,
+    device_class_set_props(dc,  f2xx_flash_properties);
 }
 
 static const TypeInfo f2xx_flash_info = {
-    .name = "f2xx.flash",
+    .name = TYPE_STM32F2XX_FLASH,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(struct f2xx_flash),
     .class_init = f2xx_flash_class_init,

@@ -32,10 +32,14 @@
  * Handle 24bpp host displays.
  */
 
-#include "qemu-common.h"
+
+#include "qemu/osdep.h"
 #include "ui/console.h"
 #include "ui/pixel_ops.h"
-#include "hw/ssi.h"
+#include "hw/ssi/ssi.h"
+#include "hw/qdev-properties.h"
+#include "hw/ssi/ssi.h"
+#include "qemu/log.h"
 
 #define NUM_ROWS 168
 #define NUM_COLS 144 // 18 bytes
@@ -319,7 +323,7 @@ static const GraphicHwOps sm_lcd_ops = {
     .invalidate = sm_lcd_invalidate_display,
 };
 
-static int sm_lcd_init(SSISlave *dev)
+static void sm_lcd_init(SSISlave *dev, Error **pError)
 {
     lcd_state *s = FROM_SSI_SLAVE(lcd_state, dev);
 
@@ -343,8 +347,6 @@ static int sm_lcd_init(SSISlave *dev)
     /* This callback informs us that power is on/off */
     qdev_init_gpio_in_named(DEVICE(dev), sm_lcd_power_ctl,
                             "power_ctl", 1);
-
-    return 0;
 }
 
 static Property sm_lcd_init_properties[] = {
@@ -357,11 +359,11 @@ static void sm_lcd_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     SSISlaveClass *k = SSI_SLAVE_CLASS(klass);
 
-    k->init = sm_lcd_init;
+    k->realize = sm_lcd_init;
     k->transfer = sm_lcd_transfer;
     k->cs_polarity = SSI_CS_LOW;
     k->parent_class.reset = sm_lcd_reset;
-    dc->props = sm_lcd_init_properties;
+    device_class_set_props(dc, sm_lcd_init_properties);
 }
 
 static const TypeInfo sm_lcd_info = {

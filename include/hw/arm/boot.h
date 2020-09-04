@@ -14,7 +14,6 @@
 #include "target/arm/cpu-qom.h"
 #include "qemu/notify.h"
 
-<<<<<<< HEAD:include/hw/arm/boot.h
 typedef enum {
     ARM_ENDIANNESS_UNKNOWN = 0,
     ARM_ENDIANNESS_LE,
@@ -31,24 +30,6 @@ typedef enum {
  * Load the guest image for an ARMv7M system. This must be called by
  * any ARMv7M board. (This is necessary to ensure that the CPU resets
  * correctly on system reset, as well as for kernel loading.)
-=======
-/* armv7m.c */
-DeviceState *armv7m_init(Object *parent, MemoryRegion *system_memory,
-                      int flash_size, int sram_size, int num_irq,
-                      const char *kernel_filename, const char *cpu_model);
-
-DeviceState *armv7m_translated_init(Object *parent, MemoryRegion *system_memory,
-                                 int flash_size, int sram_size, int num_irq,
-                                 const char *kernel_filename,
-                                 uint64_t (*translate_fn)(void *, uint64_t),
-                                 void *translate_opaque,
-                                 const char *cpu_model,
-                                 ARMCPU **cpu_device);
-
-/*
- * struct used as a parameter of the arm_load_kernel machine init
- * done notifier
->>>>>>> 919b29ba7d... Pebble Qemu:include/hw/arm/arm.h
  */
 void armv7m_load_kernel(ARMCPU *cpu, const char *kernel_filename, int mem_size);
 

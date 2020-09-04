@@ -22,7 +22,13 @@
 /*
  * QEMU DMA controller device model
  */
+
+#include "qemu/osdep.h"
 #include "hw/sysbus.h"
+#include "qemu/log.h"
+#include "hw/irq.h"
+#include "hw/qdev-properties.h"
+#include "hw/arm/stm32.h"
 
 //#define DEBUG_STM32F2XX_DMA
 #ifdef DEBUG_STM32F2XX_DMA
@@ -351,10 +357,11 @@ static const MemoryRegionOps f2xx_dma_ops = {
     }
 };
 
-static int
-f2xx_dma_init(SysBusDevice *dev)
+static void
+f2xx_dma_init(Object *obj)
 {
-    f2xx_dma *s = FROM_SYSBUS(f2xx_dma, dev);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    f2xx_dma *s = STM32F2XX_DMA(obj);
     int i;
 
     memory_region_init_io(&s->iomem, OBJECT(s), &f2xx_dma_ops, s, "dma", 0x400);
@@ -363,14 +370,12 @@ f2xx_dma_init(SysBusDevice *dev)
     for (i = 0; i < R_DMA_Sx_COUNT; i++) {
         sysbus_init_irq(dev, &s->stream[i].irq);
     }
-
-    return 0;
 }
 
 static void
 f2xx_dma_reset(DeviceState *ds)
 {
-    f2xx_dma *s = FROM_SYSBUS(f2xx_dma, SYS_BUS_DEVICE(ds));
+    f2xx_dma *s = STM32F2XX_DMA(ds);
 
     memset(&s->ifcr, 0, sizeof(s->ifcr));
 
@@ -391,17 +396,17 @@ f2xx_dma_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *sc = SYS_BUS_DEVICE_CLASS(klass);
-    sc->init = f2xx_dma_init;
     dc->reset = f2xx_dma_reset;
     //TODO: fix this: dc->no_user = 1;
-    dc->props = f2xx_dma_properties;
+    device_class_set_props(dc, f2xx_dma_properties);
 }
 
 static const TypeInfo
 f2xx_dma_info = {
-    .name          = "f2xx_dma",
+    .name          = TYPE_STM32F2XX_DMA,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(f2xx_dma),
+    .instance_init = f2xx_dma_init,
     .class_init    = f2xx_dma_class_init,
 };
 

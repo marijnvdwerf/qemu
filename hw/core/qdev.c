@@ -505,7 +505,7 @@ void qdev_init_gpio_out_named(DeviceState *dev, qemu_irq *pins,
     int old = gpio_list->num_out;
     gpio_list->out = old ? g_renew(qemu_irq, gpio_list->out, old + n) : g_new(qemu_irq, n);
     for (i = 0; i < n; ++i) {
-    	gpio_list->out[old + i] = pins[i];
+        gpio_list->out[old + i] = pins[i];
     }
 
     if (!name) {
@@ -513,7 +513,6 @@ void qdev_init_gpio_out_named(DeviceState *dev, qemu_irq *pins,
     }
     memset(pins, 0, sizeof(*pins) * n);
     for (i = 0; i < n; ++i) {
-        memset(&pins[i], 0, sizeof(*pins));
         gchar *propname = g_strdup_printf("%s[%u]", name,
                                           gpio_list->num_out + i);
 

@@ -19,8 +19,12 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "qemu/osdep.h"
 #include "hw/arm/stm32.h"
 #include "qemu/bitops.h"
+#include "hw/hw.h"
+#include "hw/qdev-properties.h"
+#include "qapi/error.h"
 
 
 
@@ -68,7 +72,7 @@ struct Stm32Afio {
         AFIO_EXTICR[AFIO_EXTICR_COUNT];
 };
 
-
+static void stm32_afio_instance_init(Object *obj);
 
 
 
@@ -234,9 +238,10 @@ uint32_t stm32_afio_get_periph_map(Stm32Afio *s, stm32_periph_t periph)
 
 /* DEVICE INITIALIZATION */
 
-static int stm32_afio_init(SysBusDevice *dev)
+static void stm32_afio_init(Object *obj)
 {
-    Stm32Afio *s = STM32_AFIO(dev);
+    SysBusDevice *dev = SYS_BUS_DEVICE(obj);
+    Stm32Afio *s = STM32_AFIO(obj);
 
     s->stm32_rcc = (Stm32Rcc *)s->stm32_rcc_prop;
 
@@ -244,7 +249,7 @@ static int stm32_afio_init(SysBusDevice *dev)
                           "afio", 0x03ff);
     sysbus_init_mmio(dev, &s->iomem);
 
-    return 0;
+    stm32_afio_instance_init(obj);
 }
 
 static Property stm32_afio_properties[] = {
@@ -257,11 +262,10 @@ static void add_gpio_link(Stm32Afio *s, int gpio_index, const char *link_name)
     object_property_add_link(OBJECT(s), link_name, TYPE_STM32_GPIO,
                                  (Object **)&s->gpio[gpio_index],
                                  object_property_allow_set_link,
-                                 OBJ_PROP_LINK_UNREF_ON_RELEASE, &error_abort);
+                             OBJ_PROP_LINK_STRONG, &error_abort);
 }
 
-static void stm32_afio_instance_init(Object *obj)
-{
+void stm32_afio_instance_init(Object *obj) {
     Stm32Afio *s = STM32_AFIO(obj);
 
     add_gpio_link(s, 0, "gpio[a]");
@@ -273,9 +277,9 @@ static void stm32_afio_instance_init(Object *obj)
     add_gpio_link(s, 6, "gpio[g]");
 
     object_property_add_link(obj, "exti", TYPE_STM32_EXTI,
-                                 (Object **)&s->exti,
-                                 object_property_allow_set_link,
-                                 OBJ_PROP_LINK_UNREF_ON_RELEASE, &error_abort);
+                             (Object **)&s->exti,
+                             object_property_allow_set_link,
+                             OBJ_PROP_LINK_STRONG, &error_abort);
 
 }
 
@@ -284,16 +288,15 @@ static void stm32_afio_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     SysBusDeviceClass *k = SYS_BUS_DEVICE_CLASS(klass);
 
-    k->init = stm32_afio_init;
     dc->reset = stm32_afio_reset;
-    dc->props = stm32_afio_properties;
+    device_class_set_props(dc, stm32_afio_properties);
 }
 
 static TypeInfo stm32_afio_info = {
     .name  = TYPE_STM32_AFIO,
     .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size  = sizeof(Stm32Afio),
-    .instance_init = stm32_afio_instance_init,
+    .instance_init = stm32_afio_init,
     .class_init = stm32_afio_class_init
 };
 

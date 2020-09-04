@@ -1308,7 +1308,6 @@ static void stellaris_init(MachineState *ms, stellaris_board_info *board)
                            &error_fatal);
     memory_region_add_subregion(system_memory, 0x20000000, sram);
 
-<<<<<<< HEAD
     nvic = qdev_create(NULL, TYPE_ARMV7M);
     qdev_prop_set_uint32(nvic, "num-irq", NUM_IRQ_LINES);
     qdev_prop_set_string(nvic, "cpu-type", ms->cpu_type);
@@ -1317,10 +1316,6 @@ static void stellaris_init(MachineState *ms, stellaris_board_info *board)
                                      "memory", &error_abort);
     /* This will exit with an error if the user passed us a bad cpu_type */
     qdev_init_nofail(nvic);
-=======
-    nvic = armv7m_init(/* no parent */ NULL, system_memory, flash_size, 128 * 1024, NUM_IRQ_LINES,
-                      kernel_filename, cpu_model);
->>>>>>> 919b29ba7d... Pebble Qemu
 
     qdev_connect_gpio_out_named(nvic, "SYSRESETREQ", 0,
                                 qemu_allocate_irq(&do_sys_reset, NULL, 0));
