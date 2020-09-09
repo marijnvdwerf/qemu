@@ -164,3 +164,4 @@ trace-ust-all.c
 storage-daemon/
 qemu-storage-daemon
 roms
+/build

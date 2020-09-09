@@ -25,6 +25,7 @@ typedef struct STM32L467State {
     STM32L476LPTimState lptim1;
     STM32L476RccState rcc;
     STM32L476FlashState flash_r;
+//    STM32L476TimState tim2;
     MemoryRegion flash_alias;
     MemoryRegion flash;
     MemoryRegion sram1;

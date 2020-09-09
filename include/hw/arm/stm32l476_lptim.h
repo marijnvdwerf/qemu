@@ -2,6 +2,7 @@
 #define HW_ARM_STM32L476_LPTIM_H
 
 #include "hw/arm/armv7m.h"
+#include "hw/ptimer.h"
 
 #define TYPE_STM32L476_LPTIM "stm32l476-lptim"
 #define STM32L476_LPTIM(obj) \
@@ -17,6 +18,7 @@ typedef struct {
 
     int64_t start;
     QEMUTimer *timer;
+    ptimer_state * ptimer;
 
     // ISR
     bool CMPM;

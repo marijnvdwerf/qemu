@@ -33,17 +33,27 @@ static int64_t stm32l47xx_lptim_next_transition(STM32L476LPTimState *s, int64_t 
 }
 
 static void stm32l476_lptim_interrupt(void *opaque) {
-    STM32L476LPTimState *s = opaque;
+//    STM32L476LPTimState *s = opaque;
+//
+//    int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
+//    s->start = now;
+//    timer_mod(s->timer, stm32l47xx_lptim_next_transition(s, now));
+//
+//    if (s->ARRMIE && s->ARRM == false) {
+//        s->ARRM = true;
+//        qemu_set_irq(s->irq, 1);
+//    }
 
-    int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
-    s->start = now;
-    timer_mod(s->timer, stm32l47xx_lptim_next_transition(s, now));
+}
+
+static void stm32l476_lptim_timer_cb(void *opaque) {
+    STM32L476LPTimState *s = opaque;
+    printf("TICK\n");
 
     if (s->ARRMIE && s->ARRM == false) {
         s->ARRM = true;
         qemu_set_irq(s->irq, 1);
     }
-
 }
 
 static void stm32l476_lptim_reset(DeviceState *dev) {
@@ -68,11 +78,14 @@ static uint64_t stm32l476_lptim_read(void *opaque, hwaddr offset,
             return out;
         }
         case LPTIM_CNT: {
-            int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
-            int64_t delta = now - s->start;
-
-            int16_t ticks = delta / TIMER_NS;
-            return ticks;
+//            int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
+//            int64_t delta = now - s->start;
+//
+//            int16_t ticks = delta / TIMER_NS;
+            ptimer_transaction_begin(s->ptimer);
+            uint64_t kI = ptimer_get_limit(s->ptimer) - ptimer_get_count(s->ptimer)-1;
+            ptimer_transaction_commit(s->ptimer);
+            return kI;
         }
 
         case LPTIM_IER: {
@@ -140,10 +153,18 @@ static void stm32l476_lptim_write(void *opaque, hwaddr offset,
                 DPRINTF("started\n");
                 int64_t now = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
                 s->start = now;
-                timer_mod(s->timer, stm32l47xx_lptim_next_transition(s, now));
+//                timer_mod(s->timer, stm32l47xx_lptim_next_transition(s, now));
+
+                ptimer_transaction_begin(s->ptimer);
+                ptimer_set_limit(s->ptimer, s->ARR, true);
+                ptimer_run(s->ptimer, 0);
+                ptimer_transaction_commit(s->ptimer);
             } else if (CNTSTRT == false && s->CNTSTRT == true) {
                 DPRINTF("stopped\n");
-                timer_del(s->timer);
+//                timer_del(s->timer);
+                ptimer_transaction_begin(s->ptimer);
+                ptimer_stop(s->ptimer);
+                ptimer_transaction_commit(s->ptimer);
             }
 
             s->ENABLE = ENABLE;
@@ -168,9 +189,9 @@ static void stm32l476_lptim_write(void *opaque, hwaddr offset,
             s->DOWNIE = (val64 >> 6) & 1;
         }
 
-//        case LPTIM_CFGR :
-//        case LPTIM_OR:
-//            break;
+        case LPTIM_CFGR :
+        case LPTIM_OR:
+            break;
 
         case LPTIM_ARR: {
             s->ARR = val64 & 0xFFFF;
@@ -202,9 +223,14 @@ static void stm32l476_lptim_init(Object *obj) {
     sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq);
 }
 
+
 static void stm32l476_lptim_realize(DeviceState *dev, Error **errp) {
     STM32L476LPTimState *s = STM32L476_LPTIM(dev);
-    s->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, stm32l476_lptim_interrupt, s);
+//    s->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, stm32l476_lptim_interrupt, s);
+    s->ptimer = ptimer_init(stm32l476_lptim_timer_cb, s, PTIMER_POLICY_DEFAULT);
+    ptimer_transaction_begin(s->ptimer);
+    ptimer_set_freq(s->ptimer, 40);
+    ptimer_transaction_commit(s->ptimer);
 }
 
 static void stm32l476_lptim_class_init(ObjectClass *klass, void *data) {

@@ -161,6 +161,9 @@
 #define USB_OTG_FIFO_BASE                    (0x00001000UL)
 #define USB_OTG_FIFO_SIZE                    (0x00001000UL)
 
+#define QSPI_BASE             (0x90000000UL) /*!< QUADSPI memories accessible over AHB base address */
+#define QSPI_R_BASE           (0xA0001000UL) /*!< QUADSPI control registers base address */
+
 #define LPTIM1_IRQn 65
 
 static uint64_t mv88w8618_wlan_read(void *opaque, hwaddr offset,
@@ -218,6 +221,21 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
 
     create_unimplemented_layer("IO", 0, 0xFFFFFFFF);
 
+    create_unimplemented_layer("SYSCFG", SYSCFG_BASE, 0x30);
+    create_unimplemented_layer("TIM2", TIM2_BASE, 0x400);
+    create_unimplemented_layer("IWDG", IWDG_BASE, 0x400);
+    create_unimplemented_layer("ADC1", ADC1_BASE, 0x100);
+    create_unimplemented_layer("ADC2", ADC2_BASE, 0x100);
+    create_unimplemented_layer("ADC3", ADC3_BASE, 0x100);
+    create_unimplemented_layer("ADC123_COMMON", ADC123_COMMON_BASE, 0x100);
+
+    create_unimplemented_layer("GPIOA", GPIOA_BASE, 0x400);
+    create_unimplemented_layer("GPIOB", GPIOB_BASE, 0x400);
+    create_unimplemented_layer("GPIOC", GPIOC_BASE, 0x400);
+    create_unimplemented_layer("EXTI", EXTI_BASE, 0x400);
+    create_unimplemented_layer("QUADSPI", QSPI_R_BASE, 0x400);
+
+
     memory_region_init_rom(&s->flash, OBJECT(dev_soc), "STM32L467.flash",
                            FLASH_SIZE, &error_fatal);
 
@@ -231,10 +249,10 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
     memory_region_add_subregion(system_memory, FLASH_BASE_ADDRESS, &s->flash_alias);
 
     memory_region_init_ram(&s->sram1, OBJECT(dev_soc), "STM32F205.sram1", 96 * 1024, &error_fatal);
-    memory_region_add_subregion(system_memory, 0x20000000, &s->sram1);
+    memory_region_add_subregion(system_memory, 0x20000000, &s->sram1); // 0x18000
 
     memory_region_init_ram(&s->sram2, OBJECT(dev_soc), "STM32F205.sram2", 32 * 1024, &error_fatal);
-    memory_region_add_subregion(system_memory, 0x10000000, &s->sram2);
+    memory_region_add_subregion(system_memory, 0x10000000, &s->sram2); // 0x8000
 
     DeviceState *armv7m = DEVICE(&s->armv7m);
     qdev_prop_set_string(armv7m, "cpu-type", ARM_CPU_TYPE_NAME("cortex-m4"));

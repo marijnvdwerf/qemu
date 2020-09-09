@@ -7,13 +7,13 @@
 
 #include "hw/arm/stm32l476_rcc.h"
 
-#define CR          0x00
-#define ICSCR       0x04
+#define RCC_CR          0x00
+#define RCC_ICSCR       0x04
 #define CFGR        0x08
-#define PLLCFGR     0x0C
+#define RCC_PLLCFGR     0x0C
 #define PLLSAI1CFGR 0x10
 #define PLLSAI2CFGR 0x14
-#define CIER        0x18
+#define RCC_CIER        0x18
 #define CIFR        0x1C
 #define CICR        0x20
 #define RESERVED0   0x24
@@ -21,7 +21,7 @@
 #define AHB2RSTR    0x2C
 #define AHB3RSTR    0x30
 #define RESERVED1   0x34
-#define APB1RSTR1   0x38
+#define RCC_APB1RSTR1   0x38
 #define APB1RSTR2   0x3C
 #define APB2RSTR    0x40
 #define RESERVED2   0x44
@@ -29,9 +29,9 @@
 #define AHB2ENR     0x4C
 #define AHB3ENR     0x50
 #define RESERVED3   0x54
-#define APB1ENR1    0x58
+#define RCC_APB1ENR1    0x58
 #define APB1ENR2    0x5C
-#define APB2ENR     0x60
+#define RCC_APB2ENR     0x60
 #define RESERVED4   0x64
 #define AHB1SMENR   0x68
 #define AHB2SMENR   0x6C
@@ -41,7 +41,7 @@
 #define APB1SMENR2  0x7C
 #define APB2SMENR   0x80
 #define RESERVED6   0x84
-#define CCIPR       0x88
+#define RCC_CCIPR       0x88
 #define RESERVED7   0x8C
 #define BDCR        0x90
 #define CSR         0x94
@@ -60,7 +60,7 @@ static uint64_t stm32l476_rcc_read(void *opaque, hwaddr offset,
     STM32L476RccState *s = opaque;
 
     switch (offset) {
-        case CR: {
+        case RCC_CR: {
             uint32_t out = 0;
             out |= 1 << 17; // HSERDY
             out |= 1 << 16; // HSEON
@@ -99,6 +99,19 @@ static void stm32l476_rcc_write(void *opaque, hwaddr offset,
     STM32L476RccState *s = opaque;
 
     switch (offset) {
+        case RCC_CR:
+        case RCC_ICSCR:
+        case RCC_PLLCFGR:
+        case RCC_CIER:
+        case RCC_APB1RSTR1:
+        case RCC_APB1ENR1:
+        case RCC_APB2ENR:
+            break;
+        case RCC_CCIPR:
+        {
+            printf("CCIPR: 0x%08X\n", val64);
+            break;
+        }
 
         case CFGR: {
             s->SW = (val64 >> 0) & 0b11;
