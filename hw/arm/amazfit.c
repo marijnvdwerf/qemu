@@ -6,6 +6,7 @@
 #include "hw/arm/stm32l467_soc.h"
 #include "hw/arm/boot.h"
 #include "hw/loader.h"
+#include "hw/ssi/ssi.h"
 
 static uint32_t readu32(hwaddr addr) {
     uint32_t ret;
@@ -16,10 +17,13 @@ static uint32_t readu32(hwaddr addr) {
 }
 
 static void bip_init(MachineState *machine) {
-    DeviceState *dev;
 
-    dev = qdev_create(NULL, TYPE_STM32L467_SOC);
+    STM32L467State *dev = STM32L467_SOC(qdev_create(NULL, TYPE_STM32L467_SOC));
     object_property_set_bool(OBJECT(dev), true, "realized", &error_fatal);
+
+    SSIBus* spi_bus = (SSIBus *)qdev_get_child_bus(&dev->spi[2], "ssi"); // SPI3
+    DeviceState * display = ssi_create_slave_no_init(spi_bus, "jdi-lpm013m126c");
+    qdev_init_nofail(display);
 
     load_image_targphys("/Users/Marijn/Downloads/bip/image.bin",
                         0,

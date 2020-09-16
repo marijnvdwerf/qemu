@@ -6,6 +6,8 @@
 #include "hw/arm/stm32l476_lptim.h"
 #include "hw/arm/stm32l476_pwr.h"
 #include "hw/arm/stm32l476_rcc.h"
+#include "hw/arm/stm32l476_dma.h"
+#include "hw/arm/stm32l476_spi.h"
 
 #define TYPE_STM32L467_SOC "stm32l467-soc"
 #define STM32L467_SOC(obj) \
@@ -25,6 +27,8 @@ typedef struct STM32L467State {
     STM32L476LPTimState lptim1;
     STM32L476RccState rcc;
     STM32L476FlashState flash_r;
+    STM32L476DmaState dma;
+    STM32L476SpiState spi[3];
 //    STM32L476TimState tim2;
     MemoryRegion flash_alias;
     MemoryRegion flash;

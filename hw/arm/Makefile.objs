@@ -60,3 +60,5 @@ obj-y += stm32l476_flash.o
 obj-y += stm32l476_lptim.o
 obj-y += stm32l476_pwr.o
 obj-y += stm32l476_rcc.o
+obj-y += stm32l476_dma.o
+obj-y += stm32l476_spi.o

@@ -48,11 +48,10 @@ static void stm32l476_lptim_interrupt(void *opaque) {
 
 static void stm32l476_lptim_timer_cb(void *opaque) {
     STM32L476LPTimState *s = opaque;
-    printf("TICK\n");
 
     if (s->ARRMIE && s->ARRM == false) {
         s->ARRM = true;
-        qemu_set_irq(s->irq, 1);
+        qemu_irq_pulse(s->irq);
     }
 }
 
@@ -229,7 +228,7 @@ static void stm32l476_lptim_realize(DeviceState *dev, Error **errp) {
 //    s->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, stm32l476_lptim_interrupt, s);
     s->ptimer = ptimer_init(stm32l476_lptim_timer_cb, s, PTIMER_POLICY_DEFAULT);
     ptimer_transaction_begin(s->ptimer);
-    ptimer_set_freq(s->ptimer, 40);
+    ptimer_set_freq(s->ptimer, 32768);
     ptimer_transaction_commit(s->ptimer);
 }
 

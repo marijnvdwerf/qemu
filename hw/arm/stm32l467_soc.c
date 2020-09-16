@@ -210,6 +210,12 @@ static void stm32l467_soc_initfn(Object *obj) {
 
     sysbus_init_child_obj(obj, "flash", &s->flash_r, sizeof(s->flash_r),
                           TYPE_STM32L476_FLASH);
+
+    sysbus_init_child_obj(obj, "DMA2", &s->dma, sizeof(s->dma),
+                          TYPE_STM32L476_DMA);
+
+    sysbus_init_child_obj(obj, "SPI3", &s->spi[2], sizeof(s->spi[2]),
+                          TYPE_STM32L476_SPI);
 }
 
 static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
@@ -228,10 +234,14 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
     create_unimplemented_layer("ADC2", ADC2_BASE, 0x100);
     create_unimplemented_layer("ADC3", ADC3_BASE, 0x100);
     create_unimplemented_layer("ADC123_COMMON", ADC123_COMMON_BASE, 0x100);
+    create_unimplemented_layer("SPI1", SPI1_BASE, 0x400);
+
 
     create_unimplemented_layer("GPIOA", GPIOA_BASE, 0x400);
     create_unimplemented_layer("GPIOB", GPIOB_BASE, 0x400);
     create_unimplemented_layer("GPIOC", GPIOC_BASE, 0x400);
+    create_unimplemented_layer("GPIOG", GPIOG_BASE, 0x400);
+
     create_unimplemented_layer("EXTI", EXTI_BASE, 0x400);
     create_unimplemented_layer("QUADSPI", QSPI_R_BASE, 0x400);
 
@@ -285,6 +295,16 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
     object_property_set_bool(OBJECT(&s->flash_r), true, "realized", &err);
     busdev = SYS_BUS_DEVICE(&s->flash_r);
     sysbus_mmio_map(busdev, 0, FLASH_R_BASE);
+
+    /* DMA registers */
+    object_property_set_bool(OBJECT(&s->dma), true, "realized", &err);
+    busdev = SYS_BUS_DEVICE(&s->dma);
+    sysbus_mmio_map(busdev, 0, DMA2_BASE);
+
+    /* SPI registers */
+    object_property_set_bool(OBJECT(&s->spi[2]), true, "realized", &err);
+    busdev = SYS_BUS_DEVICE(&s->spi[2]);
+    sysbus_mmio_map(busdev, 0, SPI3_BASE);
 
     system_clock_scale = 1000;
 }
