@@ -4,9 +4,11 @@
 #include "sysemu/sysemu.h"
 #include "exec/address-spaces.h"
 #include "qemu/log.h"
+#include "hw/irq.h"
 
 #include "hw/arm/stm32l476_dma.h"
 
+#define DMA_ISR 0x00
 #define DMA_IFCR 0x04
 #define DMA_CCRx 0x08
 
@@ -21,13 +23,63 @@ static void stm32l476_dma_reset(DeviceState *dev) {
     STM32L476DmaState *s = STM32L476_DMA(dev);
 }
 
+static void update_interrupt(STM32L476DmaState *s) {
+    for (int c = 0; c < 7; c++) {
+        int state = 0;
+        if (s->channels[c].HTIE && s->channels[c].HTIF)
+            state = 1;
+        if (s->channels[c].TCIE && s->channels[c].TCIF)
+            state = 1;
+        if (s->channels[c].TEIE && s->channels[c].TEIF)
+            state = 1;
+
+        qemu_set_irq(s->irq[c], state);
+    }
+
+}
+
+static void enable_channel(STM32L476DmaState *s, int c, bool enabled) {
+    STM32L476DmaChannelState *channel = &s->channels[c];
+    if (enabled == channel->EN)
+        return;
+
+    channel->EN = enabled;
+
+}
+
 static uint64_t stm32l476_dma_read(void *opaque, hwaddr offset,
                                    unsigned int size) {
     STM32L476DmaState *s = opaque;
 
     switch (offset) {
-        case DMA_CCR2:
-            break;
+        case DMA_ISR: {
+            uint32_t out = 0;
+            for (int i = 0; i < 7; i++) {
+                out |= (s->channels[i].TCIF || s->channels[i].HTIF || s->channels[i].TEIF) << (0 + 4 * i);
+                out |= s->channels[i].TCIF << (1 + 4 * i);
+                out |= s->channels[i].HTIF << (2 + 4 * i);
+                out |= s->channels[i].TEIF << (3 + 4 * i);
+            }
+            return out;
+        }
+
+        case DMA_CCR2: {
+            STM32L476DmaChannelState *channel = &s->channels[1];
+            uint32_t out = 0;
+            out |= channel->EN << 0;
+            out |= channel->TCIE << 1;
+            out |= channel->HTIE << 2;
+            out |= channel->TEIE << 3;
+            out |= channel->DIR << 4;
+            out |= channel->CIRC << 5;
+            out |= channel->PINC << 6;
+            out |= channel->MINC << 7;
+            out |= channel->PSIZE << 8;
+            out |= channel->MSIZE << 10;
+            out |= channel->PL << 12;
+            out |= channel->MEM2MEM << 14;
+            return out;
+        }
 
         case DMA_CSELR: {
             uint32_t out = 0;
@@ -80,14 +132,37 @@ static void stm32l476_dma_write(void *opaque, hwaddr offset,
             break;
 
         case DMA_CCR2:
+            enable_channel(s, 1, extract64(val64, 0, 1));
+
+            // not read-only, should warn
+            s->channels[1].TCIE = extract64(val64, 1, 1);
+            s->channels[1].HTIE = extract64(val64, 2, 1);
+            s->channels[1].TEIE = extract64(val64, 3, 1);
+            s->channels[1].CIRC = extract64(val64, 5, 1);
+
+            // read only, should probably error on difference
+            if (s->channels[1].EN == false) {
+                s->channels[1].DIR = extract64(val64, 4, 1);
+                s->channels[1].PINC = extract64(val64, 6, 1);
+                s->channels[1].MINC = extract64(val64, 7, 1);
+                s->channels[1].PSIZE = extract64(val64, 8, 2);
+                s->channels[1].MSIZE = extract64(val64, 10, 2);
+                s->channels[1].PL = extract64(val64, 12, 2);
+                s->channels[1].MEM2MEM = extract64(val64, 14, 1);
+            }
             break;
         case DMA_CNDTR2:
-            s->channels[1].NDTR = extract64(val64, 0, 16);
+            // read only, should probably error on difference
+            if (s->channels[1].EN == false) {
+                s->channels[1].NDTR = extract64(val64, 0, 16);
+            }
             break;
         case DMA_CPAR2:
+            // not read-only, should warn
             s->channels[1].PA = extract64(val64, 0, 32);
             break;
         case DMA_CMAR2:
+            // not read-only, should warn
             s->channels[1].MA = extract64(val64, 0, 32);
             break;
 
@@ -116,12 +191,50 @@ static const MemoryRegionOps stm32l476_dma_ops = {
     .endianness = DEVICE_NATIVE_ENDIAN,
 };
 
+static void omap_dma_request(void *opaque, int drq, int req) {
+    if (req == 0)
+        return;
+
+    STM32L476DmaChannelState *channel = opaque;
+    if (channel->CxS != drq)
+        return;
+
+    assert(channel->EN);
+
+    assert(channel->DIR == 1);
+    assert(channel->PSIZE == channel->MSIZE);
+    assert(channel->PSIZE == 0);
+    assert(channel->PINC == false);
+    assert(channel->MINC == true);
+
+    uint8_t *buffer = malloc(channel->NDTR);
+    cpu_physical_memory_read(channel->MA, buffer, channel->NDTR);
+    for (int i = 0; i < channel->NDTR; i++) {
+        cpu_physical_memory_write(channel->PA, &buffer[i], 1);
+    }
+
+    free(buffer);
+
+    channel->TCIF = true;
+    update_interrupt(channel->parent);
+}
+
 static void stm32l476_dma_init(Object *obj) {
     STM32L476DmaState *s = STM32L476_DMA(obj);
 
     memory_region_init_io(&s->mmio, obj, &stm32l476_dma_ops, s,
                           TYPE_STM32L476_DMA, 0x400);
     sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->mmio);
+
+    for (int i = 0; i < 7; i++) {
+        sysbus_init_irq(SYS_BUS_DEVICE(obj), &s->irq[i]);
+    }
+
+    for (int c = 0; c < 7; c++) {
+        s->channels[c].parent = s;
+        s->channels[c].id = c;
+        s->channels[c].drq = qemu_allocate_irqs(omap_dma_request, &s->channels[c], 8);
+    }
 }
 
 static void stm32l476_dma_class_init(ObjectClass *klass, void *data) {

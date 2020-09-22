@@ -164,7 +164,18 @@
 #define QSPI_BASE             (0x90000000UL) /*!< QUADSPI memories accessible over AHB base address */
 #define QSPI_R_BASE           (0xA0001000UL) /*!< QUADSPI control registers base address */
 
-#define LPTIM1_IRQn 65
+enum {
+    DMA2_Channel1_IRQn = 56,     /*!< DMA2 Channel 1 global Interrupt                                   */
+    DMA2_Channel2_IRQn = 57,     /*!< DMA2 Channel 2 global Interrupt                                   */
+    DMA2_Channel3_IRQn = 58,     /*!< DMA2 Channel 3 global Interrupt                                   */
+    DMA2_Channel4_IRQn = 59,     /*!< DMA2 Channel 4 global Interrupt                                   */
+    DMA2_Channel5_IRQn = 60,     /*!< DMA2 Channel 5 global Interrupt                                   */
+
+    LPTIM1_IRQn = 65,     /*!< LP TIM1 interrupt                                                 */
+
+    DMA2_Channel6_IRQn = 68,     /*!< DMA2 Channel 6 global interrupt                                   */
+    DMA2_Channel7_IRQn = 69,     /*!< DMA2 Channel 7 global interrupt                                   */
+};
 
 static uint64_t mv88w8618_wlan_read(void *opaque, hwaddr offset,
                                     unsigned size) {
@@ -216,6 +227,8 @@ static void stm32l467_soc_initfn(Object *obj) {
 
     sysbus_init_child_obj(obj, "SPI3", &s->spi[2], sizeof(s->spi[2]),
                           TYPE_STM32L476_SPI);
+    s->spi[2].rxdrq = s->dma.channels[0].drq[0b0011]; // RX
+    s->spi[2].txdrq = s->dma.channels[1].drq[0b0011]; // TX
 }
 
 static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
@@ -260,9 +273,11 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
 
     memory_region_init_ram(&s->sram1, OBJECT(dev_soc), "STM32F205.sram1", 96 * 1024, &error_fatal);
     memory_region_add_subregion(system_memory, 0x20000000, &s->sram1); // 0x18000
+    //  memsave 0x20000000 0x18000 ../sram1.bin
 
     memory_region_init_ram(&s->sram2, OBJECT(dev_soc), "STM32F205.sram2", 32 * 1024, &error_fatal);
     memory_region_add_subregion(system_memory, 0x10000000, &s->sram2); // 0x8000
+    //  memsave 0x10000000 0x8000 ../sram2.bin
 
     DeviceState *armv7m = DEVICE(&s->armv7m);
     qdev_prop_set_string(armv7m, "cpu-type", ARM_CPU_TYPE_NAME("cortex-m4"));
@@ -300,6 +315,13 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
     object_property_set_bool(OBJECT(&s->dma), true, "realized", &err);
     busdev = SYS_BUS_DEVICE(&s->dma);
     sysbus_mmio_map(busdev, 0, DMA2_BASE);
+    sysbus_connect_irq(busdev, 0, qdev_get_gpio_in(armv7m, DMA2_Channel1_IRQn));
+    sysbus_connect_irq(busdev, 1, qdev_get_gpio_in(armv7m, DMA2_Channel2_IRQn));
+    sysbus_connect_irq(busdev, 2, qdev_get_gpio_in(armv7m, DMA2_Channel3_IRQn));
+    sysbus_connect_irq(busdev, 3, qdev_get_gpio_in(armv7m, DMA2_Channel4_IRQn));
+    sysbus_connect_irq(busdev, 4, qdev_get_gpio_in(armv7m, DMA2_Channel5_IRQn));
+    sysbus_connect_irq(busdev, 5, qdev_get_gpio_in(armv7m, DMA2_Channel6_IRQn));
+    sysbus_connect_irq(busdev, 6, qdev_get_gpio_in(armv7m, DMA2_Channel7_IRQn));
 
     /* SPI registers */
     object_property_set_bool(OBJECT(&s->spi[2]), true, "realized", &err);

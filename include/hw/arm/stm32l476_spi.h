@@ -18,6 +18,10 @@ typedef struct {
 
     SSIBus *spi;
 
+    qemu_irq rxdrq;
+    qemu_irq txdrq;
+
+    bool txdmaen;
 } STM32L476SpiState;
 
 #endif
