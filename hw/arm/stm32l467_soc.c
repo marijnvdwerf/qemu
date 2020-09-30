@@ -225,6 +225,15 @@ static void stm32l467_soc_initfn(Object *obj) {
     sysbus_init_child_obj(obj, "DMA2", &s->dma, sizeof(s->dma),
                           TYPE_STM32L476_DMA);
 
+    sysbus_init_child_obj(obj, "QSPI", &s->qspi, sizeof(s->qspi),
+                          TYPE_STM32L476_QSPI);
+
+    for (int i = 0; i < 3; i++) {
+        sysbus_init_child_obj(obj, "I2C[*]", &s->i2c[i], sizeof(s->i2c[i]), TYPE_STM32L476_I2C);
+        char *name = g_strdup_printf("I2C%d", i+1);
+        qdev_prop_set_string(DEVICE(&s->i2c[i]), "name", name);
+    }
+
     sysbus_init_child_obj(obj, "SPI3", &s->spi[2], sizeof(s->spi[2]),
                           TYPE_STM32L476_SPI);
     s->spi[2].rxdrq = s->dma.channels[0].drq[0b0011]; // RX
@@ -242,6 +251,11 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
 
     create_unimplemented_layer("SYSCFG", SYSCFG_BASE, 0x30);
     create_unimplemented_layer("TIM2", TIM2_BASE, 0x400);
+    create_unimplemented_layer("TIM3", TIM3_BASE, 0x400);
+    create_unimplemented_layer("RTC", RTC_BASE, 0x400);
+    create_unimplemented_layer("RNG", RNG_BASE, 0x400);
+    create_unimplemented_layer("USART1", USART1_BASE, 0x400);
+    create_unimplemented_layer("DMA1", DMA1_BASE, 0x400);
     create_unimplemented_layer("IWDG", IWDG_BASE, 0x400);
     create_unimplemented_layer("ADC1", ADC1_BASE, 0x100);
     create_unimplemented_layer("ADC2", ADC2_BASE, 0x100);
@@ -327,6 +341,20 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
     object_property_set_bool(OBJECT(&s->spi[2]), true, "realized", &err);
     busdev = SYS_BUS_DEVICE(&s->spi[2]);
     sysbus_mmio_map(busdev, 0, SPI3_BASE);
+
+    /* QSPI registers */
+    object_property_set_bool(OBJECT(&s->qspi), true, "realized", &err);
+    busdev = SYS_BUS_DEVICE(&s->qspi);
+    sysbus_mmio_map(busdev, 0, QSPI_BASE);
+    sysbus_mmio_map(busdev, 1, QSPI_R_BASE);
+
+    /* I2C registers */
+    for (int i = 0; i < 3; i++) {
+        object_property_set_bool(OBJECT(&s->i2c[i]), true, "realized", &err);
+    }
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->i2c[0]), 0, I2C1_BASE);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->i2c[1]), 0, I2C2_BASE);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->i2c[2]), 0, I2C3_BASE);
 
     system_clock_scale = 1000;
 }

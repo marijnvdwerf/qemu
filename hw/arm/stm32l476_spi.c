@@ -15,8 +15,10 @@
 #define SPIx_DR 0x0C
 
 static void stm32l476_spi_set_txdmaen(STM32L476SpiState *s, bool enabled) {
-    s->txdmaen = enabled;
-    qemu_set_irq(s->txdrq, enabled);
+    if(s->txdmaen != enabled) {
+        s->txdmaen = enabled;
+        qemu_set_irq(s->txdrq, enabled);
+    }
 }
 
 static void stm32l476_spi_reset(DeviceState *dev) {
@@ -65,12 +67,23 @@ static void stm32l476_spi_write(void *opaque, hwaddr offset,
 
     switch (offset) {
         case SPIx_CR1:
+            break;
         case SPIx_CR2:
             stm32l476_spi_set_txdmaen(s, extract64(val64, 1, 1));
             break;
         case SPIx_DR:
-            ssi_transfer(s->spi, val64);
+        {
+            if (size == 1)
+            {
+                ssi_transfer(s->spi, val64);
+            }
+            else
+            {
+                ssi_transfer(s->spi, val64 & 0xFF);
+                ssi_transfer(s->spi, (val64 >> 8) & 0xFF);
+            }
             break;
+        }
 
         default:
             qemu_log_mask(LOG_UNIMP, "%s: unimplemented device write "

@@ -52,10 +52,20 @@ static uint8_t bitswap8(uint8_t val) {
 }
 
 uint32_t parse_header(lcd_state *s, uint16_t header) {
-    if (M0_LOW(header) && M2_HI(header)) {
+    if (header == 0x0000 || header == 0xFFFF)
+    {
+        // Dummy
+        s->state = 0;
+        return 0;
+    }
+
+    if (M0_LOW(header) && M2_HI(header))
+    {
         printf("all clear");
-        for (int x = 0; x < 176; x++) {
-            for (int y = 0; y < 176; y++) {
+        for (int x = 0; x < 176; x++)
+        {
+            for (int y = 0; y < 176; y++)
+            {
                 s->buffer[y][x].r = x % 2;
                 s->buffer[y][x].g = y % 2;
                 s->buffer[y][x].b = 0;
@@ -65,36 +75,49 @@ uint32_t parse_header(lcd_state *s, uint16_t header) {
         return 0;
     }
 
-    if (M0_HI(header) && M2_LOW(header) && M3_HI(header)) {
+    if (M0_HI(header) && M2_LOW(header))
+    {
         // Update
 
         s->state = 2;
         s->line = bitswap8(header >> 8) - 1;
         s->cur_x = 0;
-        if (M3_HI(header)) {
+        if (M3_HI(header))
+        {
             s->bpp = 4;
-        } else if (M4_HI(header)) {
+        }
+        else if (M4_HI(header))
+        {
             s->bpp = 1;
-        } else {
+        }
+        else
+        {
             s->bpp = 3;
         }
 
         return 0;
+    }
+    else
+    {
+        assert(false);
     }
 
     s->state = 0;
     return 0;
 }
 
-uint32_t jdi_lpm013m126c_transfer(SSISlave *bus, uint32_t val32) {
+uint32_t jdi_lpm013m126c_transfer(SSISlave *bus, uint32_t val32)
+{
     lcd_state *s = LCD(bus);
-    uint8_t val = bitswap8(val32 & 0xFF);
+    uint8_t val = val32 & 0xFF;
 
-    if (s->state == -1) {
+    if (s->state == -1)
+    {
         return 0;
     }
 
-    if (s->state == 0) {
+    if (s->state == 0)
+    {
         s->header = val;
         s->state = 1;
         return 0;

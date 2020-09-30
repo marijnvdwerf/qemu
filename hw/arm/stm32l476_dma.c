@@ -118,17 +118,24 @@ static void stm32l476_dma_write(void *opaque, hwaddr offset,
             for (int c = 0; c < 7; c++) {
                 if (extract64(val64, c * 4 + 0, 1) == 1) {
                     // CGIF1
+                    s->channels[c].TCIF = false;
+                    s->channels[c].HTIF = false;
+                    s->channels[c].TEIF = false;
                 }
                 if (extract64(val64, c * 4 + 1, 1) == 1) {
                     // CTCIF1
+                    s->channels[c].TCIF = false;
                 }
                 if (extract64(val64, c * 4 + 2, 1) == 1) {
                     // CHTIF1
+                    s->channels[c].HTIF = false;
                 }
                 if (extract64(val64, c * 4 + 3, 1) == 1) {
                     // CTEIF1
+                    s->channels[c].TEIF = false;
                 }
             }
+            update_interrupt(s);
             break;
 
         case DMA_CCR2:
