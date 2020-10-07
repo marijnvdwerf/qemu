@@ -16,7 +16,7 @@
     OBJECT_CHECK(STM32L467State, (obj), TYPE_STM32L467_SOC)
 
 #define FLASH_BASE_ADDRESS 0x8000000
-#define FLASH_SIZE (512 * 1024)
+#define FLASH_SIZE (1024 * 1024)
 
 
 typedef struct STM32L467State {
@@ -38,6 +38,8 @@ typedef struct STM32L467State {
     MemoryRegion flash;
     MemoryRegion sram1;
     MemoryRegion sram2;
+    DeviceState* gpio[8];
+    DeviceState *syscfg;
 } STM32L467State;
 
 #endif

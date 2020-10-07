@@ -63,5 +63,7 @@ obj-y += stm32l476_rcc.o
 obj-y += stm32l476_dma.o
 obj-y += stm32l476_spi.o
 obj-y += stm32l476_qspi.o
+obj-y += stm32l476_gpio.o
+obj-y += stm32l476_syscfg.o
 obj-y += stm32l476_i2c.o
 obj-y += it7259.o

@@ -61,7 +61,7 @@ uint32_t parse_header(lcd_state *s, uint16_t header) {
 
     if (M0_LOW(header) && M2_HI(header))
     {
-        printf("all clear");
+        printf("all clear\n");
         for (int x = 0; x < 176; x++)
         {
             for (int y = 0; y < 176; y++)
@@ -128,7 +128,7 @@ uint32_t jdi_lpm013m126c_transfer(SSISlave *bus, uint32_t val32)
 
         s->state = -1;
         parse_header(s, s->header);
-//        assert(s->state != -1);
+        assert(s->state != -1);
         return 0;
     }
 
@@ -147,9 +147,12 @@ uint32_t jdi_lpm013m126c_transfer(SSISlave *bus, uint32_t val32)
                 b = (s->fifo >> 2) & 1;
             }
 
-            s->buffer[s->line][s->cur_x].r = r;
-            s->buffer[s->line][s->cur_x].g = g;
-            s->buffer[s->line][s->cur_x].b = b;
+            if(s->cur_x < 176)
+            {
+                s->buffer[s->line][s->cur_x].r = r;
+                s->buffer[s->line][s->cur_x].g = g;
+                s->buffer[s->line][s->cur_x].b = b;
+            }
             s->fifo = s->fifo >> s->bpp;
             s->fifo_len -= s->bpp;
 

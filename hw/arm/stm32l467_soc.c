@@ -12,6 +12,9 @@
 #include "qemu/log.h"
 
 #include "hw/arm/stm32l467_soc.h"
+#include "hw/arm/stm32l476_gpio.h"
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 #define PERIPH_BASE 0x40000000UL
 #define APB1PERIPH_BASE        PERIPH_BASE
@@ -177,22 +180,6 @@ enum {
     DMA2_Channel7_IRQn = 69,     /*!< DMA2 Channel 7 global interrupt                                   */
 };
 
-static uint64_t mv88w8618_wlan_read(void *opaque, hwaddr offset,
-                                    unsigned size) {
-    printf("read @ 0x%x\n", offset);
-    return 0;
-}
-
-static void mv88w8618_wlan_write(void *opaque, hwaddr offset,
-                                 uint64_t value, unsigned size) {
-    printf("write @ 0x%x\n", offset);
-}
-
-static const MemoryRegionOps mv88w8618_wlan_ops = {
-    .read = mv88w8618_wlan_read,
-    .write =mv88w8618_wlan_write,
-    .endianness = DEVICE_NATIVE_ENDIAN,
-};
 
 static inline void create_unimplemented_layer(const char *name, hwaddr base, hwaddr size) {
     DeviceState *dev = qdev_create(NULL, TYPE_UNIMPLEMENTED_DEVICE);
@@ -249,7 +236,6 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
 
     create_unimplemented_layer("IO", 0, 0xFFFFFFFF);
 
-    create_unimplemented_layer("SYSCFG", SYSCFG_BASE, 0x30);
     create_unimplemented_layer("TIM2", TIM2_BASE, 0x400);
     create_unimplemented_layer("TIM3", TIM3_BASE, 0x400);
     create_unimplemented_layer("RTC", RTC_BASE, 0x400);
@@ -263,15 +249,41 @@ static void stm32l467_soc_realize(DeviceState *dev_soc, Error **errp) {
     create_unimplemented_layer("ADC123_COMMON", ADC123_COMMON_BASE, 0x100);
     create_unimplemented_layer("SPI1", SPI1_BASE, 0x400);
 
+    create_unimplemented_layer("CRC", CRC_BASE, 0x400);
+    create_unimplemented_layer("TIM1", TIM1_BASE, 0x400);
 
-    create_unimplemented_layer("GPIOA", GPIOA_BASE, 0x400);
-    create_unimplemented_layer("GPIOB", GPIOB_BASE, 0x400);
-    create_unimplemented_layer("GPIOC", GPIOC_BASE, 0x400);
-    create_unimplemented_layer("GPIOG", GPIOG_BASE, 0x400);
+    s->syscfg = qdev_create(NULL, "stm32l476-syscfg");
+    qdev_init_nofail(s->syscfg);
+    sysbus_mmio_map(SYS_BUS_DEVICE(s->syscfg), 0, SYSCFG_BASE);
+
+    /* GPIO */
+    struct
+    {
+        hwaddr addr;
+        char *name;
+        uint32_t GPIOx_MODER;
+        uint32_t GPIOx_OSPEEDR;
+        uint32_t GPIOx_PUPDR;
+    } const gpio_desc[] = {
+        {GPIOA_BASE, "GPIOA", 0xABFFFFFF, 0x0C000000, 0x64000000},
+        {GPIOB_BASE, "GPIOB", 0xFFFFFEBF, 0x00000000, 0x00000100},
+        {GPIOC_BASE, "GPIOC", 0xFFFFFFFF, 0x00000000, 0x00000000},
+        {GPIOD_BASE, "GPIOD", 0xFFFFFFFF, 0x00000000, 0x00000000},
+        {GPIOE_BASE, "GPIOE", 0xFFFFFFFF, 0x00000000, 0x00000000},
+        {GPIOF_BASE, "GPIOF", 0xFFFFFFFF, 0x00000000, 0x00000000},
+        {GPIOG_BASE, "GPIOG", 0xFFFFFFFF, 0x00000000, 0x00000000},
+        {GPIOH_BASE, "GPIOH", 0x0000000F, 0x00000000, 0x00000000},
+    };
+    for (int i = 0; i < ARRAY_SIZE(gpio_desc); ++i)
+    {
+        s->gpio[i] = qdev_create(NULL, TYPE_STM32L476_GPIO);
+        s->gpio[i]->id = gpio_desc[i].name;
+        qdev_init_nofail(s->gpio[i]);
+        sysbus_mmio_map(SYS_BUS_DEVICE(s->gpio[i]), 0, gpio_desc[i].addr);
+    }
 
     create_unimplemented_layer("EXTI", EXTI_BASE, 0x400);
     create_unimplemented_layer("QUADSPI", QSPI_R_BASE, 0x400);
-
 
     memory_region_init_rom(&s->flash, OBJECT(dev_soc), "STM32L467.flash",
                            FLASH_SIZE, &error_fatal);
