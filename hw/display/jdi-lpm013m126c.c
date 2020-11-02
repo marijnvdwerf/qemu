@@ -61,7 +61,6 @@ uint32_t parse_header(lcd_state *s, uint16_t header) {
 
     if (M0_LOW(header) && M2_HI(header))
     {
-        printf("all clear\n");
         for (int x = 0; x < 176; x++)
         {
             for (int y = 0; y < 176; y++)
@@ -123,7 +122,9 @@ uint32_t jdi_lpm013m126c_transfer(SSISlave *bus, uint32_t val32)
         return 0;
     }
 
-    if (s->state == 1) {
+
+    if (s->state == 1)
+    {
         s->header |= val << 8;
 
         s->state = -1;
@@ -196,7 +197,9 @@ static const GraphicHwOps sm_lcd_ops = {
     .invalidate = sm_lcd_invalidate_display,
 };
 
-static void jdi_lpm013m126c_realize(SSISlave *d, Error **errp) {
+static void
+jdi_lpm013m126c_realize(SSISlave *d, Error **errp)
+{
 
     DeviceState *dev = DEVICE(d);
     lcd_state *s = LCD(dev);
@@ -205,11 +208,27 @@ static void jdi_lpm013m126c_realize(SSISlave *d, Error **errp) {
     qemu_console_resize(s->con, 176, 176);
 }
 
-static void jdi_lpm013m126c_class_init(ObjectClass *klass, void *data) {
+int
+jdi_lpm013m126c_set_cd(SSISlave *dev, bool select)
+{
+    lcd_state *s = LCD(dev);
+
+    if (select)
+    {
+        s->state = 0;
+    }
+
+    return 0;
+}
+
+static void
+jdi_lpm013m126c_class_init(ObjectClass *klass, void *data)
+{
     SSISlaveClass *k = SSI_SLAVE_CLASS(klass);
     k->transfer = jdi_lpm013m126c_transfer;
     k->realize = jdi_lpm013m126c_realize;
-    k->cs_polarity = SSI_CS_LOW;
+    k->cs_polarity = SSI_CS_HIGH;
+    k->set_cs = jdi_lpm013m126c_set_cd;
 }
 
 static const TypeInfo jdi_lpm013m126c_info = {
