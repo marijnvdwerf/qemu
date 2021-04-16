@@ -313,6 +313,7 @@ static const FlashPartInfo known_devices[] = {
     { INFO("w25q32",      0xef4016,      0,  64 << 10,  64, ER_4K) },
     { INFO("w25q32dw",    0xef6016,      0,  64 << 10,  64, ER_4K) },
     { INFO("w25x64",      0xef3017,      0,  64 << 10, 128, ER_4K) },
+    { INFO("w25q64fw",      0xef0016,      0,  64 << 10, 128, ER_4K) },
     { INFO("w25q64",      0xef4017,      0,  64 << 10, 128, ER_4K) },
     { INFO("w25q80",      0xef5014,      0,  64 << 10,  16, ER_4K) },
     { INFO("w25q80bl",    0xef4014,      0,  64 << 10,  16, ER_4K) },
@@ -721,6 +722,14 @@ static void complete_collecting_data(Flash *s)
         break;
     case RDID_90:
     case RDID_AB:
+        if(get_man(s) == MAN_WINBOND) {
+            s->data[0] = s->pi->id[0];
+            s->data[1] = s->pi->id[2];
+            s->pos = 0;
+            s->len = 2;
+            s->data_read_loop = true;
+            s->state = STATE_READING_DATA;
+        }
         if (get_man(s) == MAN_SST) {
             if (s->cur_addr <= 1) {
                 if (s->cur_addr) {

@@ -951,6 +951,7 @@ QemuCocoaView *cocoaView;
 
 - (void) grabMouse
 {
+    return;
     COCOA_DEBUG("QemuCocoaView: grabMouse\n");
 
     if (!isFullscreen) {
@@ -969,6 +970,7 @@ QemuCocoaView *cocoaView;
 
 - (void) ungrabMouse
 {
+    return;
     COCOA_DEBUG("QemuCocoaView: ungrabMouse\n");
 
     if (!isFullscreen) {
